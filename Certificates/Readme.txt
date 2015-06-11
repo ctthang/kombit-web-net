@@ -1,0 +1,3 @@
+Certificate: claimapp.stoettesystemerne.dk
+Password: Test1234
+Thumbprint: EE9BABC44548D6AE66A6C6314EB91C5E1C754638
