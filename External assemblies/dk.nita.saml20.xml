@@ -6665,6 +6665,12 @@
             Uppercase the URL-encoded parts of the string. Needed because Ping does not seem to be able to handle lower-cased URL-encodings.
             </summary>
         </member>
+        <member name="M:dk.nita.saml20.Bindings.HttpRedirectBindingBuilder.IsUsingSha256">
+            <summary>
+            Check a setting in web.config to see whether SHA1 or SHA256 should be used
+            </summary>
+            <returns></returns>
+        </member>
         <member name="M:dk.nita.saml20.Bindings.HttpRedirectBindingBuilder.SignData(System.Byte[])">
             <summary>
             Create the signature for the data.
