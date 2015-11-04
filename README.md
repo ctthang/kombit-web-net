@@ -1,2 +1,2 @@
 # kombit-web-net
-Sample .Net Web Application using STS
+Sample .Net Web Application using Context Handler
