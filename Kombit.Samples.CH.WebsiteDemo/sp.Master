@@ -21,7 +21,6 @@
         </asp:ContentPlaceHolder>
     </div>
     <hr />
-    &copy; OIOSAML.NET (<a href="http://www.oiosaml.info/">www.oiosaml.info</a>).
     </form>
 </body>
 </html>
