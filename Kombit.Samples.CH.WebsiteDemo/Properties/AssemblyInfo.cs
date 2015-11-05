@@ -13,7 +13,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("Kombit.Samples.CH.WebsiteDemo")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("ITST")]
+[assembly: AssemblyCompany("Safewhere")]
 [assembly: AssemblyProduct("Kombit.Samples.CH.WebsiteDemo")]
 [assembly: AssemblyCopyright("")]
 [assembly: AssemblyTrademark("")]
