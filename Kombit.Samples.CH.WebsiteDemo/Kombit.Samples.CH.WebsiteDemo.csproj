@@ -166,7 +166,15 @@
   </ItemGroup>
   <ItemGroup>
     <CodeAnalysisDictionary Include="CustomDictionary.xml" />
+    <Content Include="css\bootstrap.min.css" />
+    <Content Include="css\Style.css" />
     <Content Include="Default.aspx" />
+    <Content Include="images\background-tran.png" />
+    <Content Include="images\body-bg.png" />
+    <Content Include="images\kombit.png" />
+    <Content Include="images\safewhere_logo.png" />
+    <Content Include="js\bootstrap.min.js" />
+    <Content Include="js\jquery-2.1.4.min.js" />
     <Content Include="metadata\metadata.xml" />
     <Content Include="Web.config">
       <SubType>Designer</SubType>
