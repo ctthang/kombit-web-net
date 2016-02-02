@@ -1,4 +1,4 @@
-<EntityDescriptor ID="_0051a28c-1dc2-4b2f-a3ad-8de72b7a060f" entityID="https://saml.adgangsstyring.projekt-stoettesystemerne.dk" xmlns="urn:oasis:names:tc:SAML:2.0:metadata">
+<EntityDescriptor ID="_e5c24418-a186-4647-965d-ec13dd70861a" entityID="https://saml.adgangsstyring.projekt-stoettesystemerne.dk" xmlns="urn:oasis:names:tc:SAML:2.0:metadata">
 	<IDPSSODescriptor WantAuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
 		<KeyDescriptor use="signing">
 			<KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
@@ -18,6 +18,7 @@
 		<SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://adgangsstyring.projekt-stoettesystemerne.dk/runtime/saml2/issue.idp" ResponseLocation="https://adgangsstyring.projekt-stoettesystemerne.dk/runtime/saml2/signoff.idp" />
 		<SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://adgangsstyring.projekt-stoettesystemerne.dk/runtime/saml2/issue.idp" ResponseLocation="https://adgangsstyring.projekt-stoettesystemerne.dk/runtime/saml2/signoff.idp" />
 		<SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://adgangsstyring.projekt-stoettesystemerne.dk/runtime/services/signoff/saml2/soap" ResponseLocation="https://adgangsstyring.projekt-stoettesystemerne.dk/runtime/services/signoff/saml2/soap" />
+		<NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName</NameIDFormat>
 		<SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://adgangsstyring.projekt-stoettesystemerne.dk/runtime/saml2/issue.idp" />
 		<SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://adgangsstyring.projekt-stoettesystemerne.dk/runtime/saml2/issue.idp" />
 		<Attribute Name="dk:gov:saml:attribute:KombitSpecVer" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Specification Version" xmlns="urn:oasis:names:tc:SAML:2.0:assertion">
