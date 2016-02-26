@@ -11,12 +11,12 @@ After completing this guide, the .Net-based sample web application will be confi
 
 It is assumed that the reader is a .Net-developer knowledgeable in the technologies used to develop this .Net-based sample, including:
 
-•	C#
-•	Microsoft.Net framework v4.5
-•	Microsoft Windows Server Operating System
-•	Microsoft Internet Information Systems (IIS)
-•	HTTP/HTTPS
-•	X509v3 Certificates
+* C#
+* Microsoft.Net framework v4.5
+* Microsoft Windows Server Operating System
+* Microsoft Internet Information Systems (IIS)
+* HTTP and HTTPS
+* X509v3 Certificates
 
 ## Overview Of The Sample .Net Web Application
 
