@@ -1,8 +1,9 @@
 # Certificates
 
 ## STS public certificate (Token Signing Certificate)
-- **Certificate**: `saml.adgangsstyring.projekt-stoettesystemerne.cer`
-- **Thumbprint**: `01 69 9B 6C 50 39 6A C0 60 C8 AE 9B C3 D4 B3 43 C9 B5 7E B1`
+- **Certificate**: `KOMBIT AS - KOMBIT Stoettesystemer-T.p12`
+- **Password**: `UcRlK!0DSsT9`
+- **Thumbprint**: `‎3A 10 3C F6 0A 9D 97 7B A5 A4 99 3E 06 D8 C9 BA 36 F2 58 3E`
 - **Usage**: The STS Token Signing Certificate
 
 ## Certificate for web application (Brugervendt System)
