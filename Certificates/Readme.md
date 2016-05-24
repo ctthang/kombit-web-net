@@ -1,8 +1,7 @@
 # Certificates
 
 ## STS public certificate (Token Signing Certificate)
-- **Certificate**: `KOMBIT AS - KOMBIT Stoettesystemer-T.p12`
-- **Password**: `UcRlK!0DSsT9`
+- **Certificate**: `KOMBIT AS - KOMBIT Stoettesystemer-T.cer`
 - **Thumbprint**: `‎3A 10 3C F6 0A 9D 97 7B A5 A4 99 3E 06 D8 C9 BA 36 F2 58 3E`
 - **Usage**: The STS Token Signing Certificate
 
