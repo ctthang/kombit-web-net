@@ -33,7 +33,7 @@ In this guide the metadata-file for the KOMBIT Støttesystemer Context Handler i
 ## <a name=“setup”></a>Setup
 To use this sample do the following:
 
-1. Either clone the repository <https://github.com/Safewhere/kombit-web-net.git> to `C:\kombit-web-net`, or unpack the provided zip-file `kombit-web-net.zip` to `C:\kombit-web-net`.
+1. Unpack the provided zip-file `kombit-web-net.zip` to `C:\kombit-web-net`.
 2. Open `C:\kombit-web-net\Kombit.Samples.CH.WebsiteDemo.sln` in Visual Studio, and build the solution.
 3. Make sure an SSL certificate that covers the DNS name `claimapp.projekt-stoettesystemerne.dk` is present in `LocalMachine\My` certificate store.
 4. Open the Hosts-file, and map the DNS name `claimapp.projekt-stoettesystemerne.dk` to localhost.
