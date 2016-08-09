@@ -39,5 +39,5 @@
 		}
 	],
 	"Cvr" : "66666666",
-	"AssuranceLevel" : 4
+	"AssuranceLevel" : 3
 }
