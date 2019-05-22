@@ -47,41 +47,5 @@ namespace Kombit.Samples.CH.WebsiteDemo {
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
         protected global::System.Web.UI.WebControls.Button Btn_ReloginNoForceAuthn;
-        
-        /// <summary>
-        /// Btn_ReloginNoForceAuthn_AssuranceLevel1 control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.Button Btn_ReloginNoForceAuthn_AssuranceLevel1;
-        
-        /// <summary>
-        /// Btn_ReloginNoForceAuthn_AssuranceLevel2 control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.Button Btn_ReloginNoForceAuthn_AssuranceLevel2;
-        
-        /// <summary>
-        /// Btn_ReloginNoForceAuthn_AssuranceLevel3 control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.Button Btn_ReloginNoForceAuthn_AssuranceLevel3;
-        
-        /// <summary>
-        /// Btn_ReloginNoForceAuthn_AssuranceLevel4 control.
-        /// </summary>
-        /// <remarks>
-        /// Auto-generated field.
-        /// To modify move field declaration from designer file to code-behind file.
-        /// </remarks>
-        protected global::System.Web.UI.WebControls.Button Btn_ReloginNoForceAuthn_AssuranceLevel4;
     }
 }

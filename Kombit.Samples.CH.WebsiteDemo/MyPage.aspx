@@ -47,15 +47,7 @@
         <asp:Button Id="Btn_Relogin" CssClass="btn btn-info" runat="server" Enabled="true" Text="ForceAuthn" OnClick="Btn_Relogin_Click" />
         <asp:Button Id="Btn_Passive" CssClass="btn btn-info" runat="server" Enabled="true" Text="Passive login" OnClick="Btn_Passive_Click" />
         <asp:Button Id="Btn_ReloginNoForceAuthn" CssClass="btn btn-info" runat="server" Enabled="true" Text="No ForceAuthn" OnClick="Btn_ReloginNoForceAuthn_Click" />
-        <% if (System.Configuration.ConfigurationManager.AppSettings["UseAssuranceLevel"] == "true")
-        { %>
-            <asp:Button Id="Btn_ReloginNoForceAuthn_AssuranceLevel1" CssClass="btn btn-info" runat="server" Enabled="true" Text="No ForceAuthn - Assurance Level 1" OnClick="Btn_ReloginNoForceAuthnAssuranceLevel1_Click" />
-            <asp:Button Id="Btn_ReloginNoForceAuthn_AssuranceLevel2" CssClass="btn btn-info" runat="server" Enabled="true" Text="No ForceAuthn - Assurance Level 2" OnClick="Btn_ReloginNoForceAuthnAssuranceLevel2_Click" />
-            <asp:Button Id="Btn_ReloginNoForceAuthn_AssuranceLevel3" CssClass="btn btn-info" runat="server" Enabled="true" Text="No ForceAuthn - Assurance Level 3" OnClick="Btn_ReloginNoForceAuthnAssuranceLevel3_Click" />
-            <asp:Button Id="Btn_ReloginNoForceAuthn_AssuranceLevel4" CssClass="btn btn-info" runat="server" Enabled="true" Text="No ForceAuthn - Assurance Level 4" OnClick="Btn_ReloginNoForceAuthnAssuranceLevel4_Click" />
-        
-        <% } %>
-            <hr style="border-top:dotted;  border-width:1px;" />
+        <hr style="border-top:dotted;  border-width:1px;" />
         </div>
     </div>
     <% } %>

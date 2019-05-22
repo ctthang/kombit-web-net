@@ -7,7 +7,6 @@ using dk.nita.saml20.config;
 using dk.nita.saml20.identity;
 using dk.nita.saml20.Logging;
 using dk.nita.saml20.protocol;
-using dk.nita.saml20.session;
 using Kombit.Samples.BasicPrivilegeProfileParser;
 
 #endregion
@@ -50,32 +49,6 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         protected void Btn_ReloginNoForceAuthn_Click(object sender, EventArgs e)
         {
-            Response.Redirect("/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath);
-        }
-
-        protected void Btn_ReloginNoForceAuthnAssuranceLevel1_Click(object sender, EventArgs e)
-        {
-            HandleReloginNoForceAuthnAssuranceLevel(1);
-        }
-
-        protected void Btn_ReloginNoForceAuthnAssuranceLevel2_Click(object sender, EventArgs e)
-        {
-            HandleReloginNoForceAuthnAssuranceLevel(2);
-        }
-
-        protected void Btn_ReloginNoForceAuthnAssuranceLevel3_Click(object sender, EventArgs e)
-        {
-            HandleReloginNoForceAuthnAssuranceLevel(3);
-        }
-
-        protected void Btn_ReloginNoForceAuthnAssuranceLevel4_Click(object sender, EventArgs e)
-        {
-            HandleReloginNoForceAuthnAssuranceLevel(4);
-        }
-
-        private void HandleReloginNoForceAuthnAssuranceLevel(int assuranceLevel)
-        {
-            Session[SessionConstants.RequestedAssuranceLevel] = "urn:dk:gov:saml:attribute:AssuranceLevel:" + assuranceLevel;
             Response.Redirect("/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath);
         }
 
