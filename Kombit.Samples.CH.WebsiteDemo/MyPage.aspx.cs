@@ -75,7 +75,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         private void HandleReloginNoForceAuthnAssuranceLevel(int assuranceLevel)
         {
-            Session[SessionConstants.RequestedAssuranceLevel] = "urn:dk:gov:saml:attribute:AssuranceLevel:" + assuranceLevel;
+            SessionFactory.SessionContext.Current[SessionConstants.RequestedAssuranceLevel] = "urn:dk:gov:saml:attribute:AssuranceLevel:" + assuranceLevel;
             Response.Redirect("/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath);
         }
 
