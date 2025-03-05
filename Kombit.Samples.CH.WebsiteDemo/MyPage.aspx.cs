@@ -12,6 +12,7 @@ using dk.nita.saml20.session;
 using Kombit.Samples.BasicPrivilegeProfileParser;
 using System.Collections.Generic;
 using System.Text;
+using System.Configuration;
 
 #endregion
 
@@ -113,7 +114,10 @@ namespace Kombit.Samples.CH.WebsiteDemo
         {
             if (current == null)
                 throw new ArgumentNullException("current");
-            
+
+            var profile = ConfigurationManager.AppSettings["Profile"];
+
+
             StringBuilder missingClaimTypes = new StringBuilder();
 
             if (!current.HasAttribute("https://data.gov.dk/model/core/specVersion"))
@@ -131,7 +135,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 missingClaimTypes.Append("https://data.gov.dk/concept/core/nsis/loa,");
             }
 
-            if (!current.HasAttribute("https://data.gov.dk/model/core/eid/email"))
+            if (profile != "KOMBIT_WITHOUT_PERSONAL_DATA" && !current.HasAttribute("https://data.gov.dk/model/core/eid/email"))
             {
                 missingClaimTypes.Append("https://data.gov.dk/model/core/eid/email,");
             }
