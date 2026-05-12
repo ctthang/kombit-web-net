@@ -1,8 +1,11 @@
 #region
 
 using System;
+using System.IdentityModel.Tokens;
+using System.IO;
 using System.Web;
 using System.Web.UI;
+using System.Xml;
 using dk.nita.saml20.config;
 using dk.nita.saml20.identity;
 using dk.nita.saml20.Logging;
@@ -10,6 +13,7 @@ using dk.nita.saml20.protocol;
 using dk.nita.saml20.Session;
 using dk.nita.saml20.session;
 using Kombit.Samples.BasicPrivilegeProfileParser;
+using Kombit.Samples.CH.WebsiteDemo.STS;
 using System.Collections.Generic;
 using System.Text;
 using System.Configuration;
@@ -80,6 +84,72 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 SessionStore.CurrentSession[SessionConstants.RequestedAssuranceLevel] = "https://data.gov.dk/concept/core/nsis/loa/" + nsisAssuranceLevel;
             }
             Response.Redirect("/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath);
+        }
+
+        protected void Btn_GetStsToken_Click(object sender, EventArgs e)
+        {
+            var identity = Saml20Identity.Current;
+            if (!identity.HasAttribute(Constants.BootstrapTokenClaimType))
+            {
+                StsTokenResult.InnerHtml = "<span style='color:red'>bootstrapToken attribute not present in the current SAML assertion.</span>";
+                return;
+            }
+
+            string base64Assertion = identity[Constants.BootstrapTokenClaimType][0].AttributeValue[0];
+
+            try
+            {
+                SecurityToken bootstrapToken = BootstrapTokenParser.Parse(base64Assertion);
+
+                RequestSecurityTokenConfiguration rstConfig = RequestSecurityTokenConfiguration.Get();
+                if (rstConfig == null)
+                    throw new InvalidOperationException("SecurityTokenRequest configuration section is missing or not configured in Web.config.");
+
+                SecurityToken issuedToken = StsCertificateEndpointHandler.GetSecurityToken(rstConfig, bootstrapToken);
+
+                string tokenXml = SerializeTokenToXml(issuedToken);
+
+                StsTokenResult.InnerHtml = string.Format(
+                    "<p><strong>STS issued token (raw XML):</strong></p><pre>{0}</pre>",
+                    HttpUtility.HtmlEncode(tokenXml));
+            }
+            catch (Exception ex)
+            {
+                StsTokenResult.InnerHtml = string.Format(
+                    "<span style='color:red'><strong>Error calling STS:</strong> {0}</span>",
+                    HttpUtility.HtmlEncode(ex.Message));
+            }
+        }
+
+        private static string SerializeTokenToXml(SecurityToken token)
+        {
+            var genericXmlToken = token as GenericXmlSecurityToken;
+            if (genericXmlToken != null)
+            {
+                var sb = new StringBuilder();
+                var settings = new XmlWriterSettings { Indent = true, OmitXmlDeclaration = true };
+                using (var writer = XmlWriter.Create(sb, settings))
+                {
+                    genericXmlToken.TokenXml.WriteTo(writer);
+                }
+                return sb.ToString();
+            }
+
+            // For any other token type, attempt serialization via a WS-Trust serializer
+            var wsSerializer = new System.IdentityModel.Protocols.WSTrust.WSTrust13RequestSerializer();
+            var outSb = new StringBuilder();
+            var outSettings = new XmlWriterSettings { Indent = true, OmitXmlDeclaration = true };
+            using (var ms = new MemoryStream())
+            using (var writer = XmlWriter.Create(ms, outSettings))
+            {
+                var tokenHandlers = new SecurityTokenHandlerCollection(new SecurityTokenHandler[]
+                {
+                    new Saml2SecurityTokenHandler()
+                });
+                tokenHandlers.WriteToken(writer, token);
+                writer.Flush();
+                return Encoding.UTF8.GetString(ms.ToArray());
+            }
         }
 
         protected void Btn_Logoff_Click(object sender, EventArgs e)

@@ -14,7 +14,7 @@ After completing this guide, the .Net-based sample web application will be confi
 It is assumed that the reader is a .Net-developer knowledgeable in the technologies used to develop this .Net-based sample, including:
 
 * C#
-* Microsoft.Net framework v4.5
+* Microsoft.Net framework v4.8
 * Microsoft Windows Server Operating System
 * Microsoft Internet Information Systems (IIS)
 * HTTP and HTTPS
