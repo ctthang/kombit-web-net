@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>dk.nita.saml20.ext.audit.log4net</name>
+    </assembly>
+    <members>
+        <member name="T:dk.nita.saml20.Logging.Log4NetAuditLogger">
+            <summary>
+            An implementation of the IAuditLogger interface that uses the log4net functionality to audit log.
+            </summary>
+        </member>
+        <member name="M:dk.nita.saml20.Logging.Log4NetAuditLogger.LogEntry(dk.nita.saml20.Logging.Direction,dk.nita.saml20.Logging.Operation,System.String,System.String,System.String,System.String,System.String,System.String)">
+            <summary>
+            <see cref="M:dk.nita.saml20.Logging.IAuditLogger.LogEntry(dk.nita.saml20.Logging.Direction,dk.nita.saml20.Logging.Operation,System.String,System.String,System.String,System.String,System.String,System.String)"/>
+            </summary>
+        </member>
+    </members>
+</doc>

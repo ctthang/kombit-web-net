@@ -7,11 +7,13 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace Kombit.Samples.CH.WebsiteDemo {
-    
-    
-    public partial class WebForm1 {
-        
+namespace Kombit.Samples.CH.WebsiteDemo
+{
+
+
+    public partial class WebForm1
+    {
+
         /// <summary>
         /// btnLogoff control.
         /// </summary>
@@ -20,7 +22,7 @@ namespace Kombit.Samples.CH.WebsiteDemo {
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
         protected global::System.Web.UI.WebControls.Button btnLogoff;
-        
+
         /// <summary>
         /// Btn_Relogin control.
         /// </summary>
@@ -29,7 +31,7 @@ namespace Kombit.Samples.CH.WebsiteDemo {
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
         protected global::System.Web.UI.WebControls.Button Btn_Relogin;
-        
+
         /// <summary>
         /// Btn_Passive control.
         /// </summary>
@@ -38,7 +40,7 @@ namespace Kombit.Samples.CH.WebsiteDemo {
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
         protected global::System.Web.UI.WebControls.Button Btn_Passive;
-        
+
         /// <summary>
         /// Btn_ReloginNoForceAuthn control.
         /// </summary>
@@ -47,5 +49,32 @@ namespace Kombit.Samples.CH.WebsiteDemo {
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
         protected global::System.Web.UI.WebControls.Button Btn_ReloginNoForceAuthn;
+
+        /// <summary>
+        /// Btn_ReloginNoForceAuthn_NSISAssuranceLevelLow control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button Btn_ReloginNoForceAuthn_NSISAssuranceLevelLow;
+
+        /// <summary>
+        /// Btn_ReloginNoForceAuthn_NSISAssuranceLevelSubstantial control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button Btn_ReloginNoForceAuthn_NSISAssuranceLevelSubstantial;
+
+        /// <summary>
+        /// Btn_ReloginNoForceAuthn_NSISAssuranceLevelHigh control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button Btn_ReloginNoForceAuthn_NSISAssuranceLevelHigh;
     }
 }

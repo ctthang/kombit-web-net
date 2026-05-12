@@ -7,7 +7,12 @@ using dk.nita.saml20.config;
 using dk.nita.saml20.identity;
 using dk.nita.saml20.Logging;
 using dk.nita.saml20.protocol;
+using dk.nita.saml20.Session;
+using dk.nita.saml20.session;
 using Kombit.Samples.BasicPrivilegeProfileParser;
+using System.Collections.Generic;
+using System.Text;
+using System.Configuration;
 
 #endregion
 
@@ -52,6 +57,31 @@ namespace Kombit.Samples.CH.WebsiteDemo
             Response.Redirect("/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath);
         }
 
+        protected void Btn_ReloginNoForceAuthnNSISAssuranceLevelLow_Click(object sender, EventArgs e)
+        {
+            HandleReloginNoForceAuthnAssuranceLevel("Low");
+        }
+
+        protected void Btn_ReloginNoForceAuthnNSISAssuranceLevelSubstantial_Click(object sender, EventArgs e)
+        {
+            HandleReloginNoForceAuthnAssuranceLevel("Substantial");
+        }
+
+        protected void Btn_ReloginNoForceAuthnNSISAssuranceLevelHigh_Click(object sender, EventArgs e)
+        {
+            HandleReloginNoForceAuthnAssuranceLevel("High");
+        }
+
+        private void HandleReloginNoForceAuthnAssuranceLevel(string nsisAssuranceLevel)
+        {
+            var session = SessionStore.CurrentSession;
+            if (session != null)
+            {
+                SessionStore.CurrentSession[SessionConstants.RequestedAssuranceLevel] = "https://data.gov.dk/concept/core/nsis/loa/" + nsisAssuranceLevel;
+            }
+            Response.Redirect("/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath);
+        }
+
         protected void Btn_Logoff_Click(object sender, EventArgs e)
         {
             // Example of logging required by the requirements SLO1 ("Id of internal account that is matched to SAML Assertion")
@@ -69,30 +99,67 @@ namespace Kombit.Samples.CH.WebsiteDemo
         /// <returns></returns>
         protected static string RenderAttributeValue(string name, string value)
         {
-            if (name != "dk:gov:saml:attribute:Privileges_intermediate")
-                return value;
-            //Below is the code to parse bpp value and handle the role validation process
-            //var decodedBpp = Encoding.UTF8.GetString(Convert.FromBase64String(value));
-            var bppGroupsList = PrivilegeGroupParser.Parse(value);
-            return PrivilegeGroupParser.ToJsonString(bppGroupsList);
+            if (name == "https://data.gov.dk/model/core/eid/privilegesIntermediate")
+            {
+                //Below is the code to parse bpp value and handle the role validation process
+                //var decodedBpp = Encoding.UTF8.GetString(Convert.FromBase64String(value));
+                var bppGroupsList = PrivilegeGroupParser.Parse(value);
+                return PrivilegeGroupParser.ToJsonString(bppGroupsList);
+            }
+            
+            return value;            
         }
 
-        protected static bool ValidateKombitAttributeProfile(Saml20Identity current)
+        protected static void ValidateKombitAttributeProfile(Saml20Identity current)
         {
             if (current == null)
                 throw new ArgumentNullException("current");
-            if (!current.HasAttribute("dk:gov:saml:attribute:AssuranceLevel"))
-                return false;
-            if (!current.HasAttribute("dk:gov:saml:attribute:SpecVer"))
-                return false;
-            if (!current.HasAttribute("dk:gov:saml:attribute:KombitSpecVer"))
-                return false;
-            if (!current.HasAttribute("dk:gov:saml:attribute:CvrNumberIdentifier"))
-                return false;
-            if (!current.HasAttribute("dk:gov:saml:attribute:Privileges_intermediate"))
-                return false;
 
-            return true;
+            var profile = ConfigurationManager.AppSettings["Profile"];
+
+
+            StringBuilder missingClaimTypes = new StringBuilder();
+
+            if (!current.HasAttribute("https://data.gov.dk/model/core/specVersion"))
+            {
+                missingClaimTypes.Append("https://data.gov.dk/model/core/specVersion,");
+            }
+
+            if (!current.HasAttribute("https://data.gov.dk/model/core/eid/privilegesIntermediate"))
+            {
+                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/privilegesIntermediate,");
+            }
+
+            if (!current.HasAttribute("https://data.gov.dk/concept/core/nsis/loa"))
+            {
+                missingClaimTypes.Append("https://data.gov.dk/concept/core/nsis/loa,");
+            }
+
+            if (profile != "KOMBIT_WITHOUT_PERSONAL_DATA" && !current.HasAttribute("https://data.gov.dk/model/core/eid/email"))
+            {
+                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/email,");
+            }
+
+            if (!current.HasAttribute("https://data.gov.dk/model/core/eid/professional/cvr"))
+            {
+                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/professional/cvr,");
+            }
+
+            if (!current.HasAttribute("https://data.gov.dk/model/core/eid/professional/orgName"))
+            {
+                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/professional/orgName,");
+            }
+
+            if (!current.HasAttribute("dk:gov:saml:attribute:KombitSpecVer"))
+            {
+                missingClaimTypes.Append("dk:gov:saml:attribute:KombitSpecVer,");
+            }
+            
+            if (missingClaimTypes.Length > 0)
+            {
+                var errorMessage = missingClaimTypes.ToString().TrimEnd(',');
+                throw new Exception(string.Format("Saml assertion does not meet Kombit profile. It is missing following claim types: {0}", errorMessage));
+            }
         }
     }
 }

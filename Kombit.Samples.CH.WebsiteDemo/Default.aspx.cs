@@ -21,7 +21,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
         {
             try
             {
-                FederationConfig.GetConfig().SigningCertificate.GetCertificate();
+                FederationConfig.GetConfig().GetFirstValidCertificate();
                 certificateMissing = false;
                 // GetCertificate() throws an exception when the certificate can not be retrieved.
             }

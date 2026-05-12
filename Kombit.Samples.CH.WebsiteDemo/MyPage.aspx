@@ -2,11 +2,10 @@
 <%@ Import Namespace="dk.nita.saml20.identity" %>
 <%@ Import Namespace="dk.nita.saml20.Schema.Core" %>
 <asp:Content ID="Content2" runat="server" ContentPlaceHolderID="ContentPlaceHolder1">
-    <% if (!ValidateKombitAttributeProfile(Saml20Identity.Current))
-       {
-           throw new Exception("Saml assertion does not meet Kombit profile. It must have AssuranceLevel, SpecVer, KombitSpecVer, Service and Previlege");
-       } %>
-    <% if (int.Parse(Saml20Identity.Current["dk:gov:saml:attribute:AssuranceLevel"][0].AttributeValue[0]) < 3)
+    <% ValidateKombitAttributeProfile(Saml20Identity.Current);
+       %>
+    <% if (System.Configuration.ConfigurationManager.AppSettings["OfferAssuranceLevel"] != "true" &&
+            Saml20Identity.Current["https://data.gov.dk/concept/core/nsis/loa"][0].AttributeValue[0] == "Low")
        {
            throw new Exception("Saml assertion does not have required assurance level.");
        } %>
@@ -16,7 +15,7 @@
         <div class="div-metadata-mypage-title" >
             <span class="title"><b>My page:</b></span>
         </div>
-        <b>WELCOME, <%= Saml20Identity.Current.Name + (Saml20Identity.Current.PersistentPseudonym != null ? " (Pseudonym is " + Saml20Identity.Current.PersistentPseudonym + ")" : String.Empty) %></b>
+        <b>WELCOME, <%= Saml20Identity.Current.Name %></b>
         <table>
             <thead>
                 <tr>
@@ -47,7 +46,14 @@
         <asp:Button Id="Btn_Relogin" CssClass="btn btn-info" runat="server" Enabled="true" Text="ForceAuthn" OnClick="Btn_Relogin_Click" />
         <asp:Button Id="Btn_Passive" CssClass="btn btn-info" runat="server" Enabled="true" Text="Passive login" OnClick="Btn_Passive_Click" />
         <asp:Button Id="Btn_ReloginNoForceAuthn" CssClass="btn btn-info" runat="server" Enabled="true" Text="No ForceAuthn" OnClick="Btn_ReloginNoForceAuthn_Click" />
-        <hr style="border-top:dotted;  border-width:1px;" />
+        <% if (System.Configuration.ConfigurationManager.AppSettings["OfferAssuranceLevel"] == "true")
+        { %>
+            <asp:Button Id="Btn_ReloginNoForceAuthn_NSISAssuranceLevelLow" CssClass="btn btn-info" runat="server" Enabled="true" Text="No ForceAuthn - NSIS Assurance Level Low" OnClick="Btn_ReloginNoForceAuthnNSISAssuranceLevelLow_Click" />
+            <asp:Button Id="Btn_ReloginNoForceAuthn_NSISAssuranceLevelSubstantial" CssClass="btn btn-info" runat="server" Enabled="true" Text="No ForceAuthn - NSIS Assurance Level Substantial" OnClick="Btn_ReloginNoForceAuthnNSISAssuranceLevelSubstantial_Click" />
+            <asp:Button Id="Btn_ReloginNoForceAuthn_NSISAssuranceLevelHigh" CssClass="btn btn-info" runat="server" Enabled="true" Text="No ForceAuthn - NSIS Assurance Level High" OnClick="Btn_ReloginNoForceAuthnNSISAssuranceLevelHigh_Click" />            
+        
+        <% } %>
+            <hr style="border-top:dotted;  border-width:1px;" />
         </div>
     </div>
     <% } %>
