@@ -28,6 +28,11 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
         public string AppliesTo { get; private set; }
         public X509Certificate2 ClientCertificate { get; private set; }
         public IList<Claim> Claims { get; private set; }
+        /// <summary>
+        /// DNS identity of the service endpoint certificate (optional).
+        /// Used to construct the WCF EndpointIdentity when calling the service.
+        /// </summary>
+        public string ServiceEndpointDnsIdentity { get; private set; }
 
         public static RequestSecurityTokenConfiguration Get()
         {
@@ -48,6 +53,8 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
 
             var clientCredentialElement = GetChildElementFromName(section, "ClientCredential", true);
             ClientCertificate = GetChildElementCertificateReferenceAsX509Certificate(clientCredentialElement);
+
+            ServiceEndpointDnsIdentity = GetChildElementInnerText(section, "ServiceEndpointDnsIdentity", false);
 
             var claimsElement = GetChildElementFromName(section, "Claims", false);
             if (claimsElement != null)

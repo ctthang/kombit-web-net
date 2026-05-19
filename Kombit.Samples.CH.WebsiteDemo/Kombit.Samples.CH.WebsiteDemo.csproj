@@ -226,6 +226,7 @@
     <Compile Include="STS\StsProcessException.cs" />
     <Compile Include="STS\Logging.cs" />
     <Compile Include="STS\RequestSecurityTokenConfiguration.cs" />
+    <Compile Include="STS\ServiceCaller.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="login.ashx" />

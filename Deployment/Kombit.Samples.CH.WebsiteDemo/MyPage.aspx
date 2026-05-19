@@ -65,6 +65,10 @@
                 <asp:Button ID="Btn_GetStsToken" CssClass="btn btn-primary" runat="server" Enabled="true" Text="Get STS Token (bootstrap)" OnClick="Btn_GetStsToken_Click" />
             </div>
             <div id="StsTokenResult" runat="server" style="margin-top: 10px; word-break: break-all; white-space: pre-wrap; background: #f5f5f5; padding: 10px; border: 1px solid #ccc; font-family: monospace; font-size: 12px;"></div>
+            <div style="margin-top: 10px;">
+                <asp:Button ID="Btn_CallService" CssClass="btn btn-success" runat="server" Visible="false" Enabled="true" Text="Call test service" OnClick="Btn_CallService_Click" />
+            </div>
+            <div id="ServiceCallResult" runat="server" style="margin-top: 10px; word-break: break-all; white-space: pre-wrap; background: #f5f5f5; padding: 10px; border: 1px solid #ccc; font-family: monospace; font-size: 12px;"></div>
             <hr style="border-top: dotted; border-width: 1px;" />
             <% } %>
         </div>

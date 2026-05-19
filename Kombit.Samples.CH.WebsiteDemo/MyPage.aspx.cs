@@ -107,17 +107,59 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
                 SecurityToken issuedToken = StsCertificateEndpointHandler.GetSecurityToken(rstConfig, bootstrapToken);
 
+                // Persist the issued token in session so the service call button can use it
+                Session["IssuedToken"] = issuedToken;
+
                 string tokenXml = SerializeTokenToXml(issuedToken);
 
                 StsTokenResult.InnerHtml = string.Format(
                     "<p><strong>STS issued token (raw XML):</strong></p><pre>{0}</pre>",
                     HttpUtility.HtmlEncode(tokenXml));
+
+                // Show the service call button now that we have a valid token
+                Btn_CallService.Visible = true;
+                ServiceCallResult.InnerHtml = string.Empty;
             }
             catch (Exception ex)
             {
                 StsTokenResult.InnerHtml = string.Format(
                     "<span style='color:red'><strong>Error calling STS:</strong> {0}</span>",
                     HttpUtility.HtmlEncode(ex.Message));
+            }
+        }
+
+        protected void Btn_CallService_Click(object sender, EventArgs e)
+        {
+            var issuedToken = Session["IssuedToken"] as SecurityToken;
+            if (issuedToken == null)
+            {
+                ServiceCallResult.InnerHtml = "<span style='color:red'>No issued token in session. Please click 'Get STS Token' first.</span>";
+                return;
+            }
+
+            RequestSecurityTokenConfiguration rstConfig = RequestSecurityTokenConfiguration.Get();
+            if (rstConfig == null)
+            {
+                ServiceCallResult.InnerHtml = "<span style='color:red'>SecurityTokenRequest configuration is missing.</span>";
+                return;
+            }
+
+            try
+            {
+                string serviceAddress      = rstConfig.AppliesTo;
+                string endpointDnsIdentity = rstConfig.ServiceEndpointDnsIdentity;
+
+                string response = ServiceCaller.Invoke(issuedToken, serviceAddress, endpointDnsIdentity);
+
+                ServiceCallResult.InnerHtml = string.Format(
+                    "<p><strong style='color:green'>Service call succeeded:</strong></p><pre>{0}</pre>",
+                    HttpUtility.HtmlEncode(response));
+            }
+            catch (Exception ex)
+            {
+                ServiceCallResult.InnerHtml = string.Format(
+                    "<p><strong style='color:red'>Service call failed:</strong></p><pre>{0}</pre>",
+                    HttpUtility.HtmlEncode(ex.ToString()));
             }
         }
 
