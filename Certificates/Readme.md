@@ -1,18 +1,51 @@
 # Certificates
 
-## STS public certificate (Token Signing Certificate)
-- **Certificate**: `KOMBIT AS - KOMBIT Stoettesystemer-T.cer`
-- **Thumbprint**: `‎3A 10 3C F6 0A 9D 97 7B A5 A4 99 3E 06 D8 C9 BA 36 F2 58 3E`
-- **Usage**: The STS Token Signing Certificate
+This folder contains **public** certificates only. Private key files (`.p12` / `.pfx`) must
+never be committed to source control. Follow the sections below to obtain and install all
+certificates required to run the site.
 
-## Certificate for web application (Brugervendt System)
-- **Certificate**: `saml.claimapp.projekt-stoettesystemerne.p12`
-- **Password**: `Test1234`
-- **Thumbprint**: `46 78 23 72 45 FE DC 80 59 D1 13 67 59 55 DF B8 70 D3 6B F4`
-- **Usage**: The certificate that is configured for this web application sample on the Context Handler 
+---
 
-## Certificate for web application (Brugervendt System)
-- **Certificate**: `VOCES_gyldig_2022.p12`
-- **Password**: `Test1234`
-- **Thumbprint**: `E85AC4E2A5ED9CE4CCFEF42F3F9DE1E4A521CDDD`
-- **Usage**: The certificate that is configured for this web application sample on the Context Handler 
+## Overview of required certificates
+
+| # | Role | Store | Config key |
+|---|------|-------|------------|
+| 1 | SP signing / decryption certificate (Brugervendt System) | `LocalMachine\My` | `Federation > SigningCertificates` |
+| 2 | Context Handler (IdP) token-signing certificate | `LocalMachine\TrustedPeople` or trust store | SAML metadata |
+| 3 | STS token-signing / service certificate | supplied as base64 in `Web.config` | `SecurityTokenRequest > StsEndpointCertificate` |
+| 4 | Client certificate for STS calls (mutual TLS) | `LocalMachine\My` | `SecurityTokenRequest > ClientCredential[@thumbprint]` |
+
+---
+
+## Certificate 1 — SP signing / decryption certificate (Brugervendt System)
+
+This is the certificate that identifies this web application towards the Context Handler.
+It is used to sign outgoing SAML `AuthnRequest` messages and to decrypt incoming
+`EncryptedAssertion` elements.
+
+
+## Certificate 2 — Context Handler (IdP) token-signing certificate
+
+This public certificate is included in the IdP SAML metadata and is used by the SP to
+validate incoming SAML assertions.
+
+## Certificate 3 — STS token-signing certificate
+
+The STS (Security Token Service) signs the SAML tokens it issues. The SP must trust this
+certificate to accept the issued tokens.
+
+`Web.config` carries the certificate as a **base64-encoded DER blob** inside
+`<StsEndpointCertificate>`:
+
+```xml
+<SecurityTokenRequest>
+  <StsEndpointCertificate>PASTE_BASE64_DER_BYTES_HERE</StsEndpointCertificate>
+  ...
+</SecurityTokenRequest>
+```
+
+## Certificate 4 — Client certificate for STS calls (mutual TLS)
+
+This is the certificate the web application presents to the STS when requesting a
+security token (WS-Trust, certificate endpoint). It acts as the client authentication
+credential.
