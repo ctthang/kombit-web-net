@@ -1,22 +1,31 @@
 #region
 
-using System;
-using System.IdentityModel.Tokens;
-using System.IO;
-using System.Web;
-using System.Web.UI;
-using System.Xml;
 using dk.nita.saml20.config;
 using dk.nita.saml20.identity;
 using dk.nita.saml20.Logging;
 using dk.nita.saml20.protocol;
-using dk.nita.saml20.Session;
 using dk.nita.saml20.session;
+using dk.nita.saml20.Session;
+using dk.nsi.seal;
+using dk.nsi.seal.Factories;
+using dk.nsi.seal.Model;
+using dk.nsi.seal.Vault;
 using Kombit.Samples.BasicPrivilegeProfileParser;
 using Kombit.Samples.CH.WebsiteDemo.STS;
+using Microsoft.IdentityModel.Tokens.Saml;
+using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Configuration;
+using System.IdentityModel.Tokens;
+using System.IO;
+using System.Linq;
+using System.Security.Claims;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Web;
+using System.Web.UI;
+using System.Xml;
+using System.Xml.Linq;
 
 #endregion
 
@@ -95,26 +104,41 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 return;
             }
 
-            string base64Assertion = identity[Constants.BootstrapTokenClaimType][0].AttributeValue[0];
-
             try
             {
-                SecurityToken bootstrapToken = BootstrapTokenParser.Parse(base64Assertion);
+                string base64Assertion = identity[Constants.BootstrapTokenClaimType][0].AttributeValue[0];
+                byte[] assertionBytes = Convert.FromBase64String(base64Assertion);
+                string assertionXml = Encoding.UTF8.GetString(assertionBytes);
 
-                RequestSecurityTokenConfiguration rstConfig = RequestSecurityTokenConfiguration.Get();
-                if (rstConfig == null)
-                    throw new InvalidOperationException("SecurityTokenRequest configuration section is missing or not configured in Web.config.");
+                var assertion = OIOBSTSAMLAssertionFactory.CreateOIOBSTSAMLAssertion(XElement.Parse(assertionXml));
+                var vault = new InMemoryCredentialVault(GetCertificateByThumbprint(ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]));
+                var domBuilder = new CustomOIOBSTSAMLAssertionToIDCardRequestDOMBuilder<OIOBSTSAMLAssertion>();
+                domBuilder.ItSystemName = assertion.Issuer;
+                domBuilder.Audience = "https://sts.sosi.dk/";
+                if (assertion.BasicPrivileges != null && assertion.BasicPrivileges.Privileges != null && assertion.BasicPrivileges.Privileges.Count > 0)
+                {
+                    var first = assertion.BasicPrivileges.Privileges.First();
+                    var key = first.Key;
+                    domBuilder.UserRole = key + ":" + first.Value.First();
+                }
+                domBuilder.SigningVault = vault;
+                domBuilder.SigningAlgorithm = SealSignedXml.SigningAlgorithm.Sha256;
+                domBuilder.SubjectNameId = assertion.SubjectNameId;
+                domBuilder.SetOIOSAMLAssertion(assertion);
 
-                SecurityToken issuedToken = StsCertificateEndpointHandler.GetSecurityToken(rstConfig, bootstrapToken);
+                var requestDoc = domBuilder.Build();
+                var assertionToIdCardRequest =
+                    OIOSAMLFactory.CreateOIOBSTSAMLAssertionToIDCardRequestModelBuilder().Build(requestDoc.Document);
 
-                // Persist the issued token in session so the service call button can use it
-                Session["IssuedToken"] = issuedToken;
+                var stsEndpoint = ConfigurationManager.AppSettings["sosiStsForBSTTokenExchangeUrl"];
+                var idCard = (UserIdCard)SealUtilities.SignIn(assertionToIdCardRequest, stsEndpoint);
 
-                string tokenXml = SerializeTokenToXml(issuedToken);
+                // Persist the id card in session so the service call button can use it
+                Session["IdCard"] = idCard;
 
                 StsTokenResult.InnerHtml = string.Format(
                     "<p><strong>STS issued token (raw XML):</strong></p><pre>{0}</pre>",
-                    HttpUtility.HtmlEncode(tokenXml));
+                    HttpUtility.HtmlEncode(idCard.Xassertion));
 
                 // Show the service call button now that we have a valid token
                 Btn_CallService.Visible = true;
@@ -128,28 +152,69 @@ namespace Kombit.Samples.CH.WebsiteDemo
             }
         }
 
-        protected void Btn_CallService_Click(object sender, EventArgs e)
+        private static X509Certificate2 GetCertificateByThumbprint(string thumbprint)
         {
-            var issuedToken = Session["IssuedToken"] as SecurityToken;
-            if (issuedToken == null)
+            using (var certStore = new X509Store(StoreName.My, StoreLocation.LocalMachine))
             {
-                ServiceCallResult.InnerHtml = "<span style='color:red'>No issued token in session. Please click 'Get STS Token' first.</span>";
-                return;
-            }
+                // Try to open the store.
+                certStore.Open(OpenFlags.ReadOnly);
 
-            RequestSecurityTokenConfiguration rstConfig = RequestSecurityTokenConfiguration.Get();
-            if (rstConfig == null)
-            {
-                ServiceCallResult.InnerHtml = "<span style='color:red'>SecurityTokenRequest configuration is missing.</span>";
-                return;
+                // Find the certificate that matches the thumbprint.
+                var certCollection = certStore.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, false);
+
+                if (certCollection.Count == 0)
+                {
+                    throw new InvalidOperationException($"The specified certificate with thumbprint {thumbprint} was not found!");
+                }
+
+                // Check to see if our certificate was added to the collection. If not return null else return certificate.
+                return certCollection.Count != 1 ? null : certCollection[0];
             }
+        }
+
+        private static SecurityToken Parse(XElement assertionXml)
+        {
+            if (assertionXml == null)
+                throw new ArgumentNullException("assertionXml");
+
+            var xmlDoc = new XmlDocument { PreserveWhitespace = true };
+            xmlDoc.LoadXml(assertionXml.ToString());
+            XmlElement assertionElement = xmlDoc.DocumentElement;
 
             try
             {
-                string serviceAddress      = rstConfig.AppliesTo;
-                string endpointDnsIdentity = rstConfig.ServiceEndpointDnsIdentity;
+                var handler = new Saml2SecurityTokenHandler();
 
-                string response = ServiceCaller.Invoke(issuedToken, serviceAddress, endpointDnsIdentity);
+                using (var reader = new XmlNodeReader(assertionElement))
+                {
+                    return handler.ReadToken(reader);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.Instance.Warning(ex,
+                    "Saml2SecurityTokenHandler could not deserialise bootstrap assertion; " +
+                    "falling back to GenericXmlSecurityToken.");
+                throw ex;
+            }
+        }
+
+        protected void Btn_CallService_Click(object sender, EventArgs e)
+        {
+            var idCard = Session["IdCard"] as UserIdCard;
+            if (idCard == null)
+            {
+                ServiceCallResult.InnerHtml = "<span style='color:red'>No issued token in session. Please click 'Exchange BST Token for SOSI ID Card' button first.</span>";
+                return;
+            }
+            var serviceEndpoint = ConfigurationManager.AppSettings["ntsServiceEndpoint"];
+            var serviceEndpointDnsIdentity = ConfigurationManager.AppSettings["ntsServiceEndpointDnsIdentity"];
+            try
+            {
+                string serviceAddress = serviceEndpoint;
+                string endpointDnsIdentity = serviceEndpointDnsIdentity;
+
+                string response = ServiceCaller.Invoke(Parse(idCard.Xassertion), serviceAddress, endpointDnsIdentity);
 
                 ServiceCallResult.InnerHtml = string.Format(
                     "<p><strong style='color:green'>Service call succeeded:</strong></p><pre>{0}</pre>",
@@ -160,37 +225,6 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 ServiceCallResult.InnerHtml = string.Format(
                     "<p><strong style='color:red'>Service call failed:</strong></p><pre>{0}</pre>",
                     HttpUtility.HtmlEncode(ex.ToString()));
-            }
-        }
-
-        private static string SerializeTokenToXml(SecurityToken token)
-        {
-            var genericXmlToken = token as GenericXmlSecurityToken;
-            if (genericXmlToken != null)
-            {
-                var sb = new StringBuilder();
-                var settings = new XmlWriterSettings { Indent = true, OmitXmlDeclaration = true };
-                using (var writer = XmlWriter.Create(sb, settings))
-                {
-                    genericXmlToken.TokenXml.WriteTo(writer);
-                }
-                return sb.ToString();
-            }
-
-            // For any other token type, attempt serialization via a WS-Trust serializer
-            var wsSerializer = new System.IdentityModel.Protocols.WSTrust.WSTrust13RequestSerializer();
-            var outSb = new StringBuilder();
-            var outSettings = new XmlWriterSettings { Indent = true, OmitXmlDeclaration = true };
-            using (var ms = new MemoryStream())
-            using (var writer = XmlWriter.Create(ms, outSettings))
-            {
-                var tokenHandlers = new SecurityTokenHandlerCollection(new SecurityTokenHandler[]
-                {
-                    new Saml2SecurityTokenHandler()
-                });
-                tokenHandlers.WriteToken(writer, token);
-                writer.Flush();
-                return Encoding.UTF8.GetString(ms.ToArray());
             }
         }
 
@@ -218,8 +252,8 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 var bppGroupsList = PrivilegeGroupParser.Parse(value);
                 return PrivilegeGroupParser.ToJsonString(bppGroupsList);
             }
-            
-            return value;            
+
+            return value;
         }
 
         protected static void ValidateKombitAttributeProfile(Saml20Identity current)
@@ -266,7 +300,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
             {
                 missingClaimTypes.Append("dk:gov:saml:attribute:KombitSpecVer,");
             }
-            
+
             if (missingClaimTypes.Length > 0)
             {
                 var errorMessage = missingClaimTypes.ToString().TrimEnd(',');

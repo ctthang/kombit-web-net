@@ -21,6 +21,9 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         protected void Application_Start(object sender, EventArgs e)
         {
+            System.Net.ServicePointManager.SecurityProtocol =
+                System.Net.SecurityProtocolType.Tls12 |
+                System.Net.SecurityProtocolType.Tls13;
         }
 
         protected void Session_Start(object sender, EventArgs e)
