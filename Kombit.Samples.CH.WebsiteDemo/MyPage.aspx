@@ -1,4 +1,4 @@
-<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="MyPage.aspx.cs" Inherits="Kombit.Samples.CH.WebsiteDemo.WebForm1" MasterPageFile="~/sp.Master" %>
+<%@ Page Language="C#" EnableSessionState="true" AutoEventWireup="true" CodeBehind="MyPage.aspx.cs" Inherits="Kombit.Samples.CH.WebsiteDemo.WebForm1" MasterPageFile="~/sp.Master" %>
 
 <%@ Import Namespace="dk.nita.saml20.identity" %>
 <%@ Import Namespace="dk.nita.saml20.Schema.Core" %>

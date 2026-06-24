@@ -349,9 +349,10 @@
     <Compile Include="sp.Master.designer.cs">
       <DependentUpon>sp.Master</DependentUpon>
     </Compile>
-    <Compile Include="STS\CustomOIOBSTSAMLAssertionToIDCardRequestDOMBuilder.cs" />
     <Compile Include="STS\Logging.cs" />
+    <Compile Include="STS\SampleAssertionBuilder.cs" />
     <Compile Include="STS\ServiceCaller.cs" />
+    <Compile Include="STS\Utils.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="login.ashx" />

@@ -9,10 +9,12 @@ using dk.nita.saml20.Session;
 using dk.nsi.seal;
 using dk.nsi.seal.Factories;
 using dk.nsi.seal.Model;
+using dk.nsi.seal.Model.DomBuilders;
 using dk.nsi.seal.Vault;
 using Kombit.Samples.BasicPrivilegeProfileParser;
 using Kombit.Samples.CH.WebsiteDemo.STS;
 using Microsoft.IdentityModel.Tokens.Saml;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -111,8 +113,8 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 string assertionXml = Encoding.UTF8.GetString(assertionBytes);
 
                 var assertion = OIOBSTSAMLAssertionFactory.CreateOIOBSTSAMLAssertion(XElement.Parse(assertionXml));
-                var vault = new InMemoryCredentialVault(GetCertificateByThumbprint(ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]));
-                var domBuilder = new CustomOIOBSTSAMLAssertionToIDCardRequestDOMBuilder<OIOBSTSAMLAssertion>();
+                var vault = new InMemoryCredentialVault(Utils.GetCertificateByThumbprint(ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]));
+                var domBuilder = new OIOBSTSAMLAssertionToIDCardRequestDOMBuilder<OIOBSTSAMLAssertion>();
                 domBuilder.ItSystemName = assertion.Issuer;
                 domBuilder.Audience = "https://sts.sosi.dk/";
                 if (assertion.BasicPrivileges != null && assertion.BasicPrivileges.Privileges != null && assertion.BasicPrivileges.Privileges.Count > 0)
@@ -152,53 +154,6 @@ namespace Kombit.Samples.CH.WebsiteDemo
             }
         }
 
-        private static X509Certificate2 GetCertificateByThumbprint(string thumbprint)
-        {
-            using (var certStore = new X509Store(StoreName.My, StoreLocation.LocalMachine))
-            {
-                // Try to open the store.
-                certStore.Open(OpenFlags.ReadOnly);
-
-                // Find the certificate that matches the thumbprint.
-                var certCollection = certStore.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, false);
-
-                if (certCollection.Count == 0)
-                {
-                    throw new InvalidOperationException($"The specified certificate with thumbprint {thumbprint} was not found!");
-                }
-
-                // Check to see if our certificate was added to the collection. If not return null else return certificate.
-                return certCollection.Count != 1 ? null : certCollection[0];
-            }
-        }
-
-        private static SecurityToken Parse(XElement assertionXml)
-        {
-            if (assertionXml == null)
-                throw new ArgumentNullException("assertionXml");
-
-            var xmlDoc = new XmlDocument { PreserveWhitespace = true };
-            xmlDoc.LoadXml(assertionXml.ToString());
-            XmlElement assertionElement = xmlDoc.DocumentElement;
-
-            try
-            {
-                var handler = new Saml2SecurityTokenHandler();
-
-                using (var reader = new XmlNodeReader(assertionElement))
-                {
-                    return handler.ReadToken(reader);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logging.Instance.Warning(ex,
-                    "Saml2SecurityTokenHandler could not deserialise bootstrap assertion; " +
-                    "falling back to GenericXmlSecurityToken.");
-                throw ex;
-            }
-        }
-
         protected void Btn_CallService_Click(object sender, EventArgs e)
         {
             var idCard = Session["IdCard"] as UserIdCard;
@@ -211,10 +166,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
             var serviceEndpointDnsIdentity = ConfigurationManager.AppSettings["ntsServiceEndpointDnsIdentity"];
             try
             {
-                string serviceAddress = serviceEndpoint;
-                string endpointDnsIdentity = serviceEndpointDnsIdentity;
-
-                string response = ServiceCaller.Invoke(Parse(idCard.Xassertion), serviceAddress, endpointDnsIdentity);
+                string response = ServiceCaller.Invoke(idCard, serviceEndpoint, serviceEndpointDnsIdentity);
 
                 ServiceCallResult.InnerHtml = string.Format(
                     "<p><strong style='color:green'>Service call succeeded:</strong></p><pre>{0}</pre>",
