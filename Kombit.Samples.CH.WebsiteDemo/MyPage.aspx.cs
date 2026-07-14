@@ -1,18 +1,33 @@
 #region
 
-using System;
-using System.Web;
-using System.Web.UI;
 using dk.nita.saml20.config;
 using dk.nita.saml20.identity;
 using dk.nita.saml20.Logging;
 using dk.nita.saml20.protocol;
-using dk.nita.saml20.Session;
 using dk.nita.saml20.session;
+using dk.nita.saml20.Session;
+using dk.nsi.seal;
+using dk.nsi.seal.Factories;
+using dk.nsi.seal.Model;
+using dk.nsi.seal.Model.DomBuilders;
+using dk.nsi.seal.Vault;
 using Kombit.Samples.BasicPrivilegeProfileParser;
+using Kombit.Samples.CH.WebsiteDemo.STS;
+using Microsoft.IdentityModel.Tokens.Saml;
+using Serilog;
+using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Configuration;
+using System.IdentityModel.Tokens;
+using System.IO;
+using System.Linq;
+using System.Security.Claims;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Web;
+using System.Web.UI;
+using System.Xml;
+using System.Xml.Linq;
 
 #endregion
 
@@ -82,6 +97,89 @@ namespace Kombit.Samples.CH.WebsiteDemo
             Response.Redirect("/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath);
         }
 
+        protected void Btn_GetStsToken_Click(object sender, EventArgs e)
+        {
+            var identity = Saml20Identity.Current;
+            if (!identity.HasAttribute(Constants.BootstrapTokenClaimType))
+            {
+                StsTokenResult.InnerHtml = "<span style='color:red'>bootstrapToken attribute not present in the current SAML assertion.</span>";
+                return;
+            }
+
+            try
+            {
+                string base64Assertion = identity[Constants.BootstrapTokenClaimType][0].AttributeValue[0];
+                byte[] assertionBytes = Convert.FromBase64String(base64Assertion);
+                string assertionXml = Encoding.UTF8.GetString(assertionBytes);
+
+                var assertion = OIOBSTSAMLAssertionFactory.CreateOIOBSTSAMLAssertion(XElement.Parse(assertionXml));
+                var vault = new InMemoryCredentialVault(Utils.GetCertificateByThumbprint(ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]));
+                var domBuilder = new OIOBSTSAMLAssertionToIDCardRequestDOMBuilder<OIOBSTSAMLAssertion>();
+                domBuilder.ItSystemName = assertion.Issuer;
+                domBuilder.Audience = "https://sts.sosi.dk/";
+                if (assertion.BasicPrivileges != null && assertion.BasicPrivileges.Privileges != null && assertion.BasicPrivileges.Privileges.Count > 0)
+                {
+                    var first = assertion.BasicPrivileges.Privileges.First();
+                    var key = first.Key;
+                    domBuilder.UserRole = key + ":" + first.Value.First();
+                }
+                domBuilder.SigningVault = vault;
+                domBuilder.SigningAlgorithm = SealSignedXml.SigningAlgorithm.Sha256;
+                domBuilder.SubjectNameId = assertion.SubjectNameId;
+                domBuilder.SetOIOSAMLAssertion(assertion);
+
+                var requestDoc = domBuilder.Build();
+                var assertionToIdCardRequest =
+                    OIOSAMLFactory.CreateOIOBSTSAMLAssertionToIDCardRequestModelBuilder().Build(requestDoc.Document);
+
+                var stsEndpoint = ConfigurationManager.AppSettings["sosiStsForBSTTokenExchangeUrl"];
+                var idCard = (UserIdCard)SealUtilities.SignIn(assertionToIdCardRequest, stsEndpoint);
+
+                // Persist the id card in session so the service call button can use it
+                Session["IdCard"] = idCard;
+
+                StsTokenResult.InnerHtml = string.Format(
+                    "<p><strong>STS issued token (raw XML):</strong></p><pre>{0}</pre>",
+                    HttpUtility.HtmlEncode(idCard.Xassertion));
+
+                // Show the service call button now that we have a valid token
+                Btn_CallService.Visible = true;
+                ServiceCallResult.InnerHtml = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                StsTokenResult.InnerHtml = string.Format(
+                    "<span style='color:red'><strong>Error calling STS:</strong> {0}</span>",
+                    HttpUtility.HtmlEncode(ex.Message));
+            }
+        }
+
+        protected void Btn_CallService_Click(object sender, EventArgs e)
+        {
+            var idCard = Session["IdCard"] as UserIdCard;
+            if (idCard == null)
+            {
+                ServiceCallResult.InnerHtml = "<span style='color:red'>No issued token in session. Please click 'Exchange BST Token for SOSI ID Card' button first.</span>";
+                return;
+            }
+            var serviceEndpoint = ConfigurationManager.AppSettings["ntsServiceEndpoint"];
+            var serviceEndpointDnsIdentity = ConfigurationManager.AppSettings["ntsServiceEndpointDnsIdentity"];
+            try
+            {
+                string response = ServiceCaller.Invoke(idCard, serviceEndpoint, serviceEndpointDnsIdentity);
+
+                ServiceCallResult.InnerHtml = string.Format(
+                    "<p><strong style='color:green'>Service call succeeded:</strong></p><pre>{0}</pre>",
+                    HttpUtility.HtmlEncode(response));
+            }
+            catch (Exception ex)
+            {
+                ServiceCallResult.InnerHtml = string.Format(
+                    "<p><strong style='color:red'>Service call failed:</strong></p><pre>{0}</pre>",
+                    HttpUtility.HtmlEncode(ex.ToString()));
+            }
+        }
+
         protected void Btn_Logoff_Click(object sender, EventArgs e)
         {
             // Example of logging required by the requirements SLO1 ("Id of internal account that is matched to SAML Assertion")
@@ -106,8 +204,8 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 var bppGroupsList = PrivilegeGroupParser.Parse(value);
                 return PrivilegeGroupParser.ToJsonString(bppGroupsList);
             }
-            
-            return value;            
+
+            return value;
         }
 
         protected static void ValidateKombitAttributeProfile(Saml20Identity current)
@@ -154,7 +252,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
             {
                 missingClaimTypes.Append("dk:gov:saml:attribute:KombitSpecVer,");
             }
-            
+
             if (missingClaimTypes.Length > 0)
             {
                 var errorMessage = missingClaimTypes.ToString().TrimEnd(',');
