@@ -334,7 +334,7 @@
       <DependentUpon>IDPSelectionDemo.aspx</DependentUpon>
     </Compile>
     <Compile Include="LogAction.cs" />
-    <Compile Include="NtsReference.cs" />
+    <Compile Include="Generated\NtsService\NtsReference.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="MyPage.aspx.cs">
       <SubType>ASPXCodeBehind</SubType>
@@ -380,9 +380,6 @@
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="NtsReference.config" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
