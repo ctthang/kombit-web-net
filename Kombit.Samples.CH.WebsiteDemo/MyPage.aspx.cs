@@ -11,7 +11,6 @@ using dk.nsi.seal.Factories;
 using dk.nsi.seal.Model;
 using dk.nsi.seal.Model.DomBuilders;
 using dk.nsi.seal.Vault;
-using Kombit.Samples.BasicPrivilegeProfileParser;
 using Kombit.Samples.CH.WebsiteDemo.STS;
 using System;
 using System.Collections.Generic;
@@ -227,61 +226,8 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         protected static string RenderPrivilegesIntermediateValue(string value)
         {
-            try
-            {
-                var bppGroupsList = PrivilegeGroupParser.Parse(value);
-                var root = new XElement("PrivilegeGroups");
-
-                foreach (var group in bppGroupsList ?? Enumerable.Empty<PrivilegeGroup>())
-                {
-                    var groupElement = new XElement("PrivilegeGroup");
-                    if (!string.IsNullOrEmpty(group.Scope))
-                    {
-                        groupElement.SetAttributeValue("scope", group.Scope);
-                    }
-
-                    if (group.Privilege != null)
-                    {
-                        var privilegeElement = new XElement("Privilege");
-                        if (!string.IsNullOrEmpty(group.Privilege.Type))
-                        {
-                            privilegeElement.SetAttributeValue("type", group.Privilege.Type);
-                        }
-                        if (!string.IsNullOrEmpty(group.Privilege.Cvr))
-                        {
-                            privilegeElement.SetAttributeValue("cvr", group.Privilege.Cvr);
-                        }
-                        groupElement.Add(privilegeElement);
-                    }
-
-                    if (group.Constraints != null && group.Constraints.Count > 0)
-                    {
-                        var constraintsElement = new XElement("Constraints");
-                        foreach (var constraint in group.Constraints)
-                        {
-                            var constraintElement = new XElement("Constraint");
-                            if (!string.IsNullOrEmpty(constraint.Name))
-                            {
-                                constraintElement.SetAttributeValue("name", constraint.Name);
-                            }
-                            if (!string.IsNullOrEmpty(constraint.Value))
-                            {
-                                constraintElement.SetAttributeValue("value", constraint.Value);
-                            }
-                            constraintsElement.Add(constraintElement);
-                        }
-                        groupElement.Add(constraintsElement);
-                    }
-
-                    root.Add(groupElement);
-                }
-
-                return string.Format("<pre class='attribute-xml'>{0}</pre>", HttpUtility.HtmlEncode(root.ToString()));
-            }
-            catch (Exception)
-            {
-                return string.Format("<pre class='attribute-xml'>{0}</pre>", HttpUtility.HtmlEncode(value));
-            }
+            var decodedValue = Encoding.UTF8.GetString(Convert.FromBase64String(value));
+            return string.Format("<pre class='attribute-xml'>{0}</pre>", HttpUtility.HtmlEncode(decodedValue));
         }
 
         protected static string FormatXml(string xml)
