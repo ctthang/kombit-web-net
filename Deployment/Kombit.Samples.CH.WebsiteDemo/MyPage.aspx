@@ -10,6 +10,75 @@
         {
             throw new Exception("Saml assertion does not have required assurance level.");
         } %>
+    <style type="text/css">
+        .bst-token-display {
+            display: block;
+        }
+
+        .bst-token-row {
+            margin-bottom: 10px;
+        }
+
+        .bst-token-row-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .bst-token-pre {
+            height: 200px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            margin: 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #f5f5f5;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .attribute-xml {
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            margin: 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .bst-copy-button {
+            flex: 0 0 auto;
+        }
+    </style>
+    <script type="text/javascript">
+        function copyBootstrapToken(elementId) {
+            var element = document.getElementById(elementId);
+            if (!element) {
+                return;
+            }
+
+            var text = element.textContent || element.innerText || '';
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text);
+                return;
+            }
+
+            var textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+        }
+    </script>
     <% if (Saml20Identity.IsInitialized())
         { %>
     <div class="div-claim">
