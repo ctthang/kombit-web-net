@@ -107,7 +107,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 string assertionXml = Encoding.UTF8.GetString(assertionBytes);
 
                 var assertion = OIOBSTSAMLAssertionFactory.CreateOIOBSTSAMLAssertion(XElement.Parse(assertionXml));
-                var vault = new InMemoryCredentialVault(Utils.GetCertificateByThumbprint(ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]));
+                var vault = new InMemoryCredentialVault(Utils.GetCertificateByThumbprint(ConfigurationManager.AppSettings["sosiRequestSigningCertificate"]));
                 var domBuilder = new OIOBSTSAMLAssertionToIDCardRequestDOMBuilder<OIOBSTSAMLAssertion>();
                 domBuilder.ItSystemName = assertion.Issuer;
                 domBuilder.Audience = "https://sts.sosi.dk/";
