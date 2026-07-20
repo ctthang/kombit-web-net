@@ -3,7 +3,7 @@
 <%@ Import Namespace="dk.nita.saml20.identity" %>
 <%@ Import Namespace="dk.nita.saml20.Schema.Core" %>
 <asp:Content ID="Content2" runat="server" ContentPlaceHolderID="ContentPlaceHolder1">
-    <% ValidateKombitAttributeProfile(Saml20Identity.Current);
+    <% ValidateRequestedAttributes(Saml20Identity.Current);
     %>
     <% if (System.Configuration.ConfigurationManager.AppSettings["OfferAssuranceLevel"] != "true" &&
               Saml20Identity.Current["https://data.gov.dk/concept/core/nsis/loa"][0].AttributeValue[0] == "Low")

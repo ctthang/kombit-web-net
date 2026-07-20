@@ -13,20 +13,14 @@ using dk.nsi.seal.Model.DomBuilders;
 using dk.nsi.seal.Vault;
 using Kombit.Samples.BasicPrivilegeProfileParser;
 using Kombit.Samples.CH.WebsiteDemo.STS;
-using Microsoft.IdentityModel.Tokens.Saml;
-using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
-using System.IdentityModel.Tokens;
-using System.IO;
 using System.Linq;
-using System.Security.Claims;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Web;
+using System.Web.Configuration;
 using System.Web.UI;
-using System.Xml;
 using System.Xml.Linq;
 
 #endregion
@@ -295,56 +289,59 @@ namespace Kombit.Samples.CH.WebsiteDemo
             return XElement.Parse(xml).ToString();
         }
 
-        protected static void ValidateKombitAttributeProfile(Saml20Identity current)
+        protected static void ValidateRequestedAttributes(Saml20Identity current)
         {
             if (current == null)
                 throw new ArgumentNullException("current");
 
             var profile = ConfigurationManager.AppSettings["Profile"];
+            var missingClaimTypes = new StringBuilder();
 
-
-            StringBuilder missingClaimTypes = new StringBuilder();
-
-            if (!current.HasAttribute("https://data.gov.dk/model/core/specVersion"))
+            foreach (var requestedAttribute in GetRequestedAttributes())
             {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/specVersion,");
-            }
+                if (ShouldSkipRequestedAttribute(requestedAttribute.Key, profile))
+                {
+                    continue;
+                }
 
-            if (!current.HasAttribute("https://data.gov.dk/model/core/eid/privilegesIntermediate"))
-            {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/privilegesIntermediate,");
-            }
-
-            if (!current.HasAttribute("https://data.gov.dk/concept/core/nsis/loa"))
-            {
-                missingClaimTypes.Append("https://data.gov.dk/concept/core/nsis/loa,");
-            }
-
-            if (profile != "KOMBIT_WITHOUT_PERSONAL_DATA" && !current.HasAttribute("https://data.gov.dk/model/core/eid/email"))
-            {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/email,");
-            }
-
-            if (!current.HasAttribute("https://data.gov.dk/model/core/eid/professional/cvr"))
-            {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/professional/cvr,");
-            }
-
-            if (!current.HasAttribute("https://data.gov.dk/model/core/eid/professional/orgName"))
-            {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/professional/orgName,");
-            }
-
-            if (!current.HasAttribute("dk:gov:saml:attribute:KombitSpecVer"))
-            {
-                missingClaimTypes.Append("dk:gov:saml:attribute:KombitSpecVer,");
+                if (requestedAttribute.Value && !current.HasAttribute(requestedAttribute.Key))
+                {
+                    missingClaimTypes.Append(requestedAttribute.Key + ",");
+                }
             }
 
             if (missingClaimTypes.Length > 0)
             {
                 var errorMessage = missingClaimTypes.ToString().TrimEnd(',');
-                throw new Exception(string.Format("Saml assertion does not meet Kombit profile. It is missing following claim types: {0}", errorMessage));
+                throw new Exception(string.Format("Saml assertion does not meet the requested attribute profile. It is missing following claim types: {0}", errorMessage));
             }
+        }
+
+        private static IEnumerable<KeyValuePair<string, bool>> GetRequestedAttributes()
+        {
+            var configPath = WebConfigurationManager.OpenWebConfiguration("~").FilePath;
+            var document = XDocument.Load(configPath);
+            var namespaceName = "urn:dk.nita.saml20.configuration";
+            var requestedAttributes = document.Descendants(XName.Get("RequestedAttributes", namespaceName))
+                .Elements(XName.Get("att", namespaceName))
+                .Select(attribute => new KeyValuePair<string, bool>(
+                    (string)attribute.Attribute("name"),
+                    IsRequired(attribute)));
+
+            return requestedAttributes.ToList();
+        }
+
+        private static bool IsRequired(XElement attribute)
+        {
+            var value = (string)attribute.Attribute("isRequired");
+            bool isRequired;
+            return bool.TryParse(value, out isRequired) ? isRequired : false;
+        }
+
+        private static bool ShouldSkipRequestedAttribute(string attributeName, string profile)
+        {
+            return string.Equals(profile, "KOMBIT_WITHOUT_PERSONAL_DATA", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(attributeName, "https://data.gov.dk/model/core/eid/email", StringComparison.OrdinalIgnoreCase);
         }
     }
 }
