@@ -1,18 +1,26 @@
 #region
 
-using System;
-using System.Web;
-using System.Web.UI;
 using dk.nita.saml20.config;
 using dk.nita.saml20.identity;
 using dk.nita.saml20.Logging;
 using dk.nita.saml20.protocol;
-using dk.nita.saml20.Session;
 using dk.nita.saml20.session;
-using Kombit.Samples.BasicPrivilegeProfileParser;
+using dk.nita.saml20.Session;
+using dk.nsi.seal;
+using dk.nsi.seal.Factories;
+using dk.nsi.seal.Model;
+using dk.nsi.seal.Model.DomBuilders;
+using dk.nsi.seal.Vault;
+using Kombit.Samples.CH.WebsiteDemo.STS;
+using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Configuration;
+using System.Linq;
+using System.Text;
+using System.Web;
+using System.Web.Configuration;
+using System.Web.UI;
+using System.Xml.Linq;
 
 #endregion
 
@@ -82,6 +90,89 @@ namespace Kombit.Samples.CH.WebsiteDemo
             Response.Redirect("/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath);
         }
 
+        protected void Btn_GetStsToken_Click(object sender, EventArgs e)
+        {
+            var identity = Saml20Identity.Current;
+            if (!identity.HasAttribute(Constants.BootstrapTokenClaimType))
+            {
+                StsTokenResult.InnerHtml = "<span style='color:red'>bootstrapToken attribute not present in the current SAML assertion.</span>";
+                return;
+            }
+
+            try
+            {
+                string base64Assertion = identity[Constants.BootstrapTokenClaimType][0].AttributeValue[0];
+                byte[] assertionBytes = Convert.FromBase64String(base64Assertion);
+                string assertionXml = Encoding.UTF8.GetString(assertionBytes);
+
+                var assertion = OIOBSTSAMLAssertionFactory.CreateOIOBSTSAMLAssertion(XElement.Parse(assertionXml));
+                var vault = new InMemoryCredentialVault(Utils.GetCertificateByThumbprint(ConfigurationManager.AppSettings["sosiRequestSigningCertificate"]));
+                var domBuilder = new OIOBSTSAMLAssertionToIDCardRequestDOMBuilder<OIOBSTSAMLAssertion>();
+                domBuilder.ItSystemName = assertion.Issuer;
+                domBuilder.Audience = "https://sts.sosi.dk/";
+                if (assertion.BasicPrivileges != null && assertion.BasicPrivileges.Privileges != null && assertion.BasicPrivileges.Privileges.Count > 0)
+                {
+                    var first = assertion.BasicPrivileges.Privileges.First();
+                    var key = first.Key;
+                    domBuilder.UserRole = key + ":" + first.Value.First();
+                }
+                domBuilder.SigningVault = vault;
+                domBuilder.SigningAlgorithm = SealSignedXml.SigningAlgorithm.Sha256;
+                domBuilder.SubjectNameId = assertion.SubjectNameId;
+                domBuilder.SetOIOSAMLAssertion(assertion);
+
+                var requestDoc = domBuilder.Build();
+                var assertionToIdCardRequest =
+                    OIOSAMLFactory.CreateOIOBSTSAMLAssertionToIDCardRequestModelBuilder().Build(requestDoc.Document);
+
+                var stsEndpoint = ConfigurationManager.AppSettings["sosiStsForBSTTokenExchangeUrl"];
+                var idCard = (UserIdCard)SealUtilities.SignIn(assertionToIdCardRequest, stsEndpoint);
+
+                // Persist the id card in session so the service call button can use it
+                Session["IdCard"] = idCard;
+
+                StsTokenResult.InnerHtml = string.Format(
+                    "<p><strong>STS issued token (raw XML):</strong></p><pre>{0}</pre>",
+                    HttpUtility.HtmlEncode(idCard.Xassertion));
+
+                // Show the service call button now that we have a valid token
+                Btn_CallService.Visible = true;
+                ServiceCallResult.InnerHtml = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                StsTokenResult.InnerHtml = string.Format(
+                    "<span style='color:red'><strong>Error calling STS:</strong> {0}</span>",
+                    HttpUtility.HtmlEncode(ex.Message));
+            }
+        }
+
+        protected void Btn_CallService_Click(object sender, EventArgs e)
+        {
+            var idCard = Session["IdCard"] as UserIdCard;
+            if (idCard == null)
+            {
+                ServiceCallResult.InnerHtml = "<span style='color:red'>No issued token in session. Please click 'Exchange BST Token for SOSI ID Card' button first.</span>";
+                return;
+            }
+            var serviceEndpoint = ConfigurationManager.AppSettings["ntsServiceEndpoint"];
+            var serviceEndpointDnsIdentity = ConfigurationManager.AppSettings["ntsServiceEndpointDnsIdentity"];
+            try
+            {
+                string response = ServiceCaller.Invoke(idCard, serviceEndpoint, serviceEndpointDnsIdentity);
+
+                ServiceCallResult.InnerHtml = string.Format(
+                    "<p><strong style='color:green'>Service call succeeded:</strong></p><pre>{0}</pre>",
+                    HttpUtility.HtmlEncode(response));
+            }
+            catch (Exception ex)
+            {
+                ServiceCallResult.InnerHtml = string.Format(
+                    "<p><strong style='color:red'>Service call failed:</strong></p><pre>{0}</pre>",
+                    HttpUtility.HtmlEncode(ex.ToString()));
+            }
+        }
+
         protected void Btn_Logoff_Click(object sender, EventArgs e)
         {
             // Example of logging required by the requirements SLO1 ("Id of internal account that is matched to SAML Assertion")
@@ -99,67 +190,104 @@ namespace Kombit.Samples.CH.WebsiteDemo
         /// <returns></returns>
         protected static string RenderAttributeValue(string name, string value)
         {
+            if (name == Constants.BootstrapTokenClaimType)
+            {
+                return RenderBootstrapTokenValue(value);
+            }
+
             if (name == "https://data.gov.dk/model/core/eid/privilegesIntermediate")
             {
-                //Below is the code to parse bpp value and handle the role validation process
-                //var decodedBpp = Encoding.UTF8.GetString(Convert.FromBase64String(value));
-                var bppGroupsList = PrivilegeGroupParser.Parse(value);
-                return PrivilegeGroupParser.ToJsonString(bppGroupsList);
+                return RenderPrivilegesIntermediateValue(value);
             }
-            
-            return value;            
+
+            return value;
         }
 
-        protected static void ValidateKombitAttributeProfile(Saml20Identity current)
+        protected static string RenderBootstrapTokenValue(string base64Value)
+        {
+            byte[] assertionBytes = Convert.FromBase64String(base64Value);
+            string assertionXml = Encoding.UTF8.GetString(assertionBytes);
+            string formattedAssertionXml = FormatXml(assertionXml);
+
+            return string.Format(
+                "<div class='bst-token-display'>" +
+                "<div class='bst-token-row'>" +
+                "<div class='bst-token-row-header'><strong>Bootstrap token (base64)</strong><button type='button' class='btn btn-default btn-xs bst-copy-button' onclick=\"copyBootstrapToken('bstRawToken')\">Copy</button></div>" +
+                "<pre id='bstRawToken' class='bst-token-pre'>{0}</pre>" +
+                "</div>" +
+                "<div class='bst-token-row'>" +
+                "<div class='bst-token-row-header'><strong>Decoded bootstrap token XML</strong><button type='button' class='btn btn-default btn-xs bst-copy-button' onclick=\"copyBootstrapToken('bstDecodedToken')\">Copy</button></div>" +
+                "<pre id='bstDecodedToken' class='bst-token-pre'>{1}</pre>" +
+                "</div>" +
+                "</div>",
+                HttpUtility.HtmlEncode(base64Value),
+                HttpUtility.HtmlEncode(formattedAssertionXml));
+        }
+
+        protected static string RenderPrivilegesIntermediateValue(string value)
+        {
+            var decodedValue = Encoding.UTF8.GetString(Convert.FromBase64String(value));
+            return string.Format("<pre class='attribute-xml'>{0}</pre>", HttpUtility.HtmlEncode(decodedValue));
+        }
+
+        protected static string FormatXml(string xml)
+        {
+            return XElement.Parse(xml).ToString();
+        }
+
+        protected static void ValidateRequestedAttributes(Saml20Identity current)
         {
             if (current == null)
                 throw new ArgumentNullException("current");
 
             var profile = ConfigurationManager.AppSettings["Profile"];
+            var missingClaimTypes = new StringBuilder();
 
-
-            StringBuilder missingClaimTypes = new StringBuilder();
-
-            if (!current.HasAttribute("https://data.gov.dk/model/core/specVersion"))
+            foreach (var requestedAttribute in GetRequestedAttributes())
             {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/specVersion,");
+                if (ShouldSkipRequestedAttribute(requestedAttribute.Key, profile))
+                {
+                    continue;
+                }
+
+                if (requestedAttribute.Value && !current.HasAttribute(requestedAttribute.Key))
+                {
+                    missingClaimTypes.Append(requestedAttribute.Key + ",");
+                }
             }
 
-            if (!current.HasAttribute("https://data.gov.dk/model/core/eid/privilegesIntermediate"))
-            {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/privilegesIntermediate,");
-            }
-
-            if (!current.HasAttribute("https://data.gov.dk/concept/core/nsis/loa"))
-            {
-                missingClaimTypes.Append("https://data.gov.dk/concept/core/nsis/loa,");
-            }
-
-            if (profile != "KOMBIT_WITHOUT_PERSONAL_DATA" && !current.HasAttribute("https://data.gov.dk/model/core/eid/email"))
-            {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/email,");
-            }
-
-            if (!current.HasAttribute("https://data.gov.dk/model/core/eid/professional/cvr"))
-            {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/professional/cvr,");
-            }
-
-            if (!current.HasAttribute("https://data.gov.dk/model/core/eid/professional/orgName"))
-            {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/professional/orgName,");
-            }
-
-            if (!current.HasAttribute("dk:gov:saml:attribute:KombitSpecVer"))
-            {
-                missingClaimTypes.Append("dk:gov:saml:attribute:KombitSpecVer,");
-            }
-            
             if (missingClaimTypes.Length > 0)
             {
                 var errorMessage = missingClaimTypes.ToString().TrimEnd(',');
-                throw new Exception(string.Format("Saml assertion does not meet Kombit profile. It is missing following claim types: {0}", errorMessage));
+                throw new Exception(string.Format("Saml assertion does not meet the requested attribute profile. It is missing following claim types: {0}", errorMessage));
             }
+        }
+
+        private static IEnumerable<KeyValuePair<string, bool>> GetRequestedAttributes()
+        {
+            var configPath = WebConfigurationManager.OpenWebConfiguration("~").FilePath;
+            var document = XDocument.Load(configPath);
+            var namespaceName = "urn:dk.nita.saml20.configuration";
+            var requestedAttributes = document.Descendants(XName.Get("RequestedAttributes", namespaceName))
+                .Elements(XName.Get("att", namespaceName))
+                .Select(attribute => new KeyValuePair<string, bool>(
+                    (string)attribute.Attribute("name"),
+                    IsRequired(attribute)));
+
+            return requestedAttributes.ToList();
+        }
+
+        private static bool IsRequired(XElement attribute)
+        {
+            var value = (string)attribute.Attribute("isRequired");
+            bool isRequired;
+            return bool.TryParse(value, out isRequired) ? isRequired : false;
+        }
+
+        private static bool ShouldSkipRequestedAttribute(string attributeName, string profile)
+        {
+            return string.Equals(profile, "KOMBIT_WITHOUT_PERSONAL_DATA", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(attributeName, "https://data.gov.dk/model/core/eid/email", StringComparison.OrdinalIgnoreCase);
         }
     }
 }
