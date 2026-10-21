@@ -26,6 +26,9 @@
                     <img alt="Kombit" src="images/kombit.png" class="header-logo" />
                 </div>
                 <br />
+                <% if (Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyWeb.Enabled) { %>
+                <p><a href="<%= ResolveUrl("~/Emergency.aspx") %>">Prepare emergency access</a> <a href="<%= ResolveUrl("~/EmergencyLogin.aspx") %>">Local emergency login</a></p>
+                <% } %>
                 <div>
                     <asp:ContentPlaceHolder ID="ContentPlaceHolder1" runat="server">
                     </asp:ContentPlaceHolder>

@@ -1,0 +1,5 @@
+body{margin:0;background:#f3f5f6;color:#24333f;font:16px/1.5 system-ui,sans-serif}main{max-width:850px;margin:2rem auto;padding:2rem;background:#fff;border:1px solid #cbd5df;border-radius:6px}nav{display:flex;gap:1rem;flex-wrap:wrap}label{display:block}button,input{font:inherit;padding:.6rem;margin:.3rem .3rem .3rem 0}button{cursor:pointer}button:disabled{cursor:default}.notice{border-left:4px solid #a66b09;background:#fff4db;padding:1rem}li{padding:.7rem 0;overflow-wrap:anywhere}#status{font-weight:600}dt{font-weight:600}dd{overflow-wrap:anywhere}a{color:#15548c}[hidden]{display:none!important}
+
+#issuer-diagnostics { margin-top: 2rem; border-top: 1px solid #aaa; padding-top: 1rem; }
+#issuer-call-results { overflow-wrap: anywhere; }
+#issuer-call-results li { margin-bottom: .75rem; }

@@ -1,0 +1,20 @@
+{
+  "Origin": "https://saml.example.invalid",
+  "RpId": "saml.example.invalid",
+  "EmergencyIssuer": "https://identify.example.invalid/runtime/emergency",
+  "IssuerRuntimeUrl": "https://identify.example.invalid/runtime/",
+  "NormalSamlIssuer": "https://identify.example.invalid/runtime",
+  "Audience": "urn:emergency:saml-example",
+  "StateDirectory": "C:\\ProgramData\\SafewhereSamples\\SamlEmergency\\state",
+  "PrivateEncryptionKeyFile": "C:\\ProgramData\\SafewhereSamples\\SamlEmergency\\decryption-key.bin",
+  "EncryptionKeyId": "saml-emergency-encryption",
+  "InitialSigningKeysFile": "C:\\ProgramData\\SafewhereSamples\\SamlEmergency\\issuer-signing-keys.json",
+  "BackendSecretVariable": "SAML_EMERGENCY_ISSUER_KEY",
+  "OperatorSecretVariable": "SAML_EMERGENCY_OPERATOR_KEY",
+  "PreserveNormalClaims": true,
+      "ClaimTypes": ["https://data.gov.dk/model/core/eid/email", "https://data.gov.dk/model/core/eid/professional/cvr"],
+  "Roles": [],
+  "Privileges": [],
+  "PrivilegeScopes": [],
+  "SessionMinutes": 480
+}

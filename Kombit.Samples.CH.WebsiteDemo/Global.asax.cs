@@ -21,6 +21,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         protected void Application_Start(object sender, EventArgs e)
         {
+            EmergencyFeature.EmergencyWeb.Start();
             System.Net.ServicePointManager.SecurityProtocol =
                 System.Net.SecurityProtocolType.Tls12 |
                 System.Net.SecurityProtocolType.Tls13;
@@ -32,10 +33,12 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         protected void Application_BeginRequest(object sender, EventArgs e)
         {
+            EmergencyFeature.EmergencyWeb.Begin(Context);
         }
 
         protected void Application_AuthenticateRequest(object sender, EventArgs e)
         {
+            if (EmergencyFeature.EmergencyWeb.Authenticate(Context)) { return; }
             // The OIOSAML.net session could have timed out or the user could have been logget out throug SOAP logout.
             // Sign user out if user was logged in.
             if (!Saml20Identity.IsInitialized() && HttpContext.Current.User != null &&
@@ -56,6 +59,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         protected void Application_End(object sender, EventArgs e)
         {
+            EmergencyFeature.EmergencyWeb.Stop();
         }
     }
 }

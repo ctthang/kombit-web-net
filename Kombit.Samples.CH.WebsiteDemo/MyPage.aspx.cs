@@ -37,6 +37,11 @@ namespace Kombit.Samples.CH.WebsiteDemo
     {
         protected void Page_PreInit(object sender, EventArgs e)
         {
+            if (EmergencyFeature.EmergencyWeb.IsEmergency(Context))
+            {
+                if (Request.HttpMethod != "GET") { throw new HttpException(403, "Normal token actions are unavailable in emergency mode."); }
+                Response.Redirect(ResolveUrl("~/EmergencyHome.aspx"), true);
+            }
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Globalization", "CA1303:Do not pass literals as localized parameters", MessageId = "System.Web.UI.Page.set_Title(System.String)", Justification = "This is a demo project and thus localization is not necessary.")]
@@ -99,6 +104,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         protected void Btn_GetStsToken_Click(object sender, EventArgs e)
         {
+            EmergencyFeature.EmergencyWeb.RejectNormalAction(Context);
             var identity = Saml20Identity.Current;
             if (!identity.HasAttribute(Constants.BootstrapTokenClaimType))
             {
@@ -156,6 +162,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         protected void Btn_CallService_Click(object sender, EventArgs e)
         {
+            EmergencyFeature.EmergencyWeb.RejectNormalAction(Context);
             var idCard = Session["IdCard"] as UserIdCard;
             if (idCard == null)
             {

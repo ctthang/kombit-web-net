@@ -1,0 +1,38 @@
+<%@ Master Language="C#" %>
+<%@ Import Namespace="Kombit.Samples.CH.WebsiteDemo.EmergencyFeature" %>
+<%@ Import Namespace="System.Security.Claims" %>
+<%@ Import Namespace="System" %>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Emergency access — SAML sample</title><link rel="stylesheet" href="<%= ResolveUrl("~/EmergencyAssets/emergency.css") %>" /></head>
+<body><% EmergencyPage view = (EmergencyPage)Page; %>
+<main id="saml-emergency" data-api="<%= ResolveUrl("~/EmergencyApi.ashx") %>" data-mode="<%: view.Mode %>" data-accepting="<%: view.Accepting ? "true" : "false" %>">
+<nav><a href="<%= ResolveUrl("~/Default.aspx") %>">Normal application</a> <a href="<%= ResolveUrl("~/EmergencyLogin.aspx") %>">Emergency login</a> <a href="<%= ResolveUrl("~/EmergencyOperator.aspx") %>">Local operator</a></nav>
+<h1>Emergency access</h1><p class="notice">Proof of concept. Emergency access uses local key verification. It does not provide normal NSIS assurance.</p>
+<input id="csrf" type="hidden" value="<%: view.CsrfToken %>" /><p id="status" role="status" aria-live="polite"></p>
+<% if (view.Mode == "prepare") { %>
+<h2>Prepare this browser</h2><p>Use a key with user verification and no passkey backup. Complete registration, browser storage, and a separate key check.</p>
+<p><a href="<%= ResolveUrl("~/login.ashx?ReturnUrl=Emergency.aspx") %>">Get a new normal login for preparation or renewal</a></p>
+<button id="register" type="button" <% if (!view.CanPrepare) { %>disabled<% } %>>Prepare this browser</button>
+<p id="storage-note">Clearing or evicting site data loses preparation. A different browser profile is not prepared.</p><ul id="saved-keys"></ul>
+<p>If issuance succeeded but storage or delivery failed, its binding can still count towards the issuer's key limit. Ask the operator to remove the binding before trying again.</p>
+<% } else if (view.Mode == "login") { %>
+<h2>Local emergency login</h2>
+<% if (view.Accepting) { %><p>Select a locally stored credential. This page and the key check do not contact Identify.</p><ul id="saved-keys"></ul><% } else { %><p>Emergency acceptance is off. A local operator must enable it first.</p><% } %>
+<% } else if (view.Mode == "operator") { %>
+<h2>Local operator</h2><p>Operator sessions last 15 minutes. Keep the operator key outside source control.</p>
+<form id="operator-form" method="post"><label for="operator-key">Operator key</label><input id="operator-key" type="password" autocomplete="current-password" maxlength="512" required /><button>Sign in locally</button></form>
+<section id="operator-panel" <% if (!view.OperatorAuthenticated) { %>hidden<% } %>>
+<p id="operator-status"></p><label for="duration">Acceptance duration in minutes (0 means no window end)</label><input id="duration" type="number" min="0" max="1440" value="60" />
+<button id="enable" type="button">Enable emergency acceptance</button><button id="disable" type="button">Stop acceptance and emergency sessions</button>
+<h3>Block locally</h3><label for="binding-id">Binding ID shown on the preparation page</label><input id="binding-id" maxlength="128" /><label><input id="block-account" type="checkbox" />Block the account's keys</label><button id="block" type="button">Apply local block</button>
+<h3>Explicit online synchronization</h3><p>This operation contacts Identify for signing keys, central revocations, and queued key removal reports. The emergency login flow does not call it.</p><button id="sync" type="button">Synchronize with Identify now</button><button id="operator-exit" type="button">Sign out operator</button><h3>Recent events</h3><ul id="events"></ul>
+</section>
+<% } else if (view.Mode == "home") { %>
+<h2>Emergency session</h2><p>Normal SAML logout, reauthentication, STS token exchange, and token-based service calls are unavailable.</p>
+<p>Session ends: <%: DateTimeOffset.FromUnixTimeSeconds(long.Parse(view.EmergencyUser.FindFirst("emergency_expiry").Value)).ToString("u") %></p><button id="exit" type="button">Sign out locally</button>
+<h3>Permitted claims</h3><dl><% foreach (Claim claim in view.EmergencyUser.Claims) { if (claim.Type != "emergency_session") { %><dt><%: claim.Type %></dt><dd><%: claim.Value %></dd><% } } %></dl>
+<% } else { %><h2>Session ended</h2><p>Your session expired or local acceptance is unavailable. A new key check is required when the operator enables access.</p><% } %>
+<asp:ContentPlaceHolder ID="Body" runat="server" />
+<noscript>JavaScript, IndexedDB, and WebAuthn are required.</noscript><details id="issuer-diagnostics"><summary>Identify endpoint results (PoC)</summary><p>Results from this browser tab only. Up to 8 latest Identify calls per action and 40 recent entries are shown. Bodies, keys, tokens, and personal claims are omitted. HTTP success alone does not mean preparation or login succeeded.</p><button id="clear-issuer-diagnostics" type="button">Clear displayed history</button><ol id="issuer-call-results"></ol></details>
+</main>
+<script src="<%= ResolveUrl("~/EmergencyAssets/emergency.js") %>" defer></script></body></html>

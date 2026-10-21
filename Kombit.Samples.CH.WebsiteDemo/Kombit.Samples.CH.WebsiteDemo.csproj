@@ -428,6 +428,29 @@ xcopy /D /Q /Y "$(ProjectDir)*.aspx" "$(SolutionDir)Deployment\Kombit.Samples.CH
 xcopy /D /Q /Y "$(ProjectDir)*.ashx" "$(SolutionDir)Deployment\Kombit.Samples.CH.WebsiteDemo\"
 xcopy /D /Q /Y "$(ProjectDir)web.config" "$(SolutionDir)Deployment\Kombit.Samples.CH.WebsiteDemo\"
 xcopy /D /Q /Y "$(ProjectDir)sp.Master" "$(SolutionDir)Deployment\Kombit.Samples.CH.WebsiteDemo\"
-xcopy /D /Q /Y "$(ProjectDir)Web.config.nemlogin-template" "$(SolutionDir)Deployment\Kombit.Samples.CH.WebsiteDemo\"</PostBuildEvent>
+xcopy /D /Q /Y "$(ProjectDir)Web.config.nemlogin-template" "$(SolutionDir)Deployment\Kombit.Samples.CH.WebsiteDemo\"
+xcopy /D /Q /Y "$(ProjectDir)Emergency.Master" "$(SolutionDir)Deployment\Kombit.Samples.CH.WebsiteDemo\"
+xcopy /E /I /D /Q /Y "$(ProjectDir)EmergencyAssets" "$(SolutionDir)Deployment\Kombit.Samples.CH.WebsiteDemo\EmergencyAssets\"</PostBuildEvent>
   </PropertyGroup>
+  <ItemGroup>
+    <Content Include="Emergency.aspx" />
+    <Content Include="Emergency.Master" />
+    <Content Include="EmergencyApi.ashx" />
+    <Content Include="EmergencyAssets\emergency.css" />
+    <Content Include="EmergencyAssets\emergency.js" />
+    <Content Include="EmergencyEnded.aspx" />
+    <Compile Include="EmergencyFeature\EmergencyApi.cs" />
+    <Compile Include="EmergencyFeature\EmergencyNormalLoginAction.cs" />
+    <Compile Include="EmergencyFeature\EmergencyPage.cs">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="EmergencyFeature\EmergencyWeb.cs" />
+    <Content Include="EmergencyHome.aspx" />
+    <Content Include="EmergencyLogin.aspx" />
+    <Content Include="EmergencyOperator.aspx" />
+    <ProjectReference Include="..\Kombit.Samples.CH.Emergency\Kombit.Samples.CH.Emergency.csproj">
+      <Project>{C5F8CA15-728D-4A02-BDBB-067EAF6DA1D9}</Project>
+      <Name>Kombit.Samples.CH.Emergency</Name>
+    </ProjectReference>
+  </ItemGroup>
 </Project>

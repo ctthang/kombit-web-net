@@ -48,3 +48,8 @@ To use this sample do the following:
 8. Assign the application pool identity for the web application read permissions to the private key for the certificate imported in the previous step.
 9. Open a browser and point it to <https://claimapp.projekt-stoettesystemerne.dk>
 10. Click the [Go to My Page](https://claimapp.projekt-stoettesystemerne.dk/MyPage.aspx) to login using the Context Handler. 
+
+
+## Optional emergency access
+
+Emergency support is disabled by default. See [the emergency PoC guide](README-emergency.md) for configuration, preparation, local operator controls, tests, and known limits.
