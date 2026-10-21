@@ -1,5 +1,18 @@
 #region
 
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.IdentityModel.Tokens;
+using System.IO;
+using System.Linq;
+using System.Security.Claims;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Web;
+using System.Web.UI;
+using System.Xml;
+using System.Xml.Linq;
 using dk.nita.saml20.config;
 using dk.nita.saml20.identity;
 using dk.nita.saml20.Logging;
@@ -15,19 +28,6 @@ using Kombit.Samples.BasicPrivilegeProfileParser;
 using Kombit.Samples.CH.WebsiteDemo.STS;
 using Microsoft.IdentityModel.Tokens.Saml;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.IdentityModel.Tokens;
-using System.IO;
-using System.Linq;
-using System.Security.Claims;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Web;
-using System.Web.UI;
-using System.Xml;
-using System.Xml.Linq;
 
 #endregion
 
@@ -39,12 +39,23 @@ namespace Kombit.Samples.CH.WebsiteDemo
         {
             if (EmergencyFeature.EmergencyWeb.IsEmergency(Context))
             {
-                if (Request.HttpMethod != "GET") { throw new HttpException(403, "Normal token actions are unavailable in emergency mode."); }
+                if (Request.HttpMethod != "GET")
+                {
+                    throw new HttpException(
+                        403,
+                        "Normal token actions are unavailable in emergency mode."
+                    );
+                }
                 Response.Redirect(ResolveUrl("~/EmergencyHome.aspx"), true);
             }
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Globalization", "CA1303:Do not pass literals as localized parameters", MessageId = "System.Web.UI.Page.set_Title(System.String)", Justification = "This is a demo project and thus localization is not necessary.")]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Microsoft.Globalization",
+            "CA1303:Do not pass literals as localized parameters",
+            MessageId = "System.Web.UI.Page.set_Title(System.String)",
+            Justification = "This is a demo project and thus localization is not necessary."
+        )]
         protected void Page_Load(object sender, EventArgs e)
         {
             Title = "My page on SP " + SAML20FederationConfig.GetConfig().ServiceProvider.ID;
@@ -54,40 +65,67 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 // Example of logging required by the requirements BSA6/SSO6 ("Id of internal account that is matched to SAML Assertion")
                 // Since FormsAuthentication is used in this sample, the user name to log can be found in context.User.Identity.Name.
                 // This user will not be set until after a new redirect, so unfortunately we cannot just log it in our LogAction.LoginAction
-                AuditLogging.logEntry(Direction.IN, Operation.LOGIN, "ServiceProvider login",
-                    "SP internal user id: " +
-                    (Context.User.Identity.IsAuthenticated ? Context.User.Identity.Name : "(not logged in)"));
+                AuditLogging.logEntry(
+                    Direction.IN,
+                    Operation.LOGIN,
+                    "ServiceProvider login",
+                    "SP internal user id: "
+                        + (
+                            Context.User.Identity.IsAuthenticated
+                                ? Context.User.Identity.Name
+                                : "(not logged in)"
+                        )
+                );
             }
         }
 
         protected void Btn_Relogin_Click(object sender, EventArgs e)
         {
-            Response.Redirect("/login.ashx?" + Saml20SignonHandler.IDPForceAuthn + "=true&ReturnUrl=" +
-                              HttpContext.Current.Request.Url.AbsolutePath);
+            Response.Redirect(
+                "/login.ashx?"
+                    + Saml20SignonHandler.IDPForceAuthn
+                    + "=true&ReturnUrl="
+                    + HttpContext.Current.Request.Url.AbsolutePath
+            );
         }
 
         protected void Btn_Passive_Click(object sender, EventArgs e)
         {
-            Response.Redirect("/login.ashx?" + Saml20SignonHandler.IDPIsPassive + "=true&ReturnUrl=" +
-                              HttpContext.Current.Request.Url.AbsolutePath);
+            Response.Redirect(
+                "/login.ashx?"
+                    + Saml20SignonHandler.IDPIsPassive
+                    + "=true&ReturnUrl="
+                    + HttpContext.Current.Request.Url.AbsolutePath
+            );
         }
 
         protected void Btn_ReloginNoForceAuthn_Click(object sender, EventArgs e)
         {
-            Response.Redirect("/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath);
+            Response.Redirect(
+                "/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath
+            );
         }
 
-        protected void Btn_ReloginNoForceAuthnNSISAssuranceLevelLow_Click(object sender, EventArgs e)
+        protected void Btn_ReloginNoForceAuthnNSISAssuranceLevelLow_Click(
+            object sender,
+            EventArgs e
+        )
         {
             HandleReloginNoForceAuthnAssuranceLevel("Low");
         }
 
-        protected void Btn_ReloginNoForceAuthnNSISAssuranceLevelSubstantial_Click(object sender, EventArgs e)
+        protected void Btn_ReloginNoForceAuthnNSISAssuranceLevelSubstantial_Click(
+            object sender,
+            EventArgs e
+        )
         {
             HandleReloginNoForceAuthnAssuranceLevel("Substantial");
         }
 
-        protected void Btn_ReloginNoForceAuthnNSISAssuranceLevelHigh_Click(object sender, EventArgs e)
+        protected void Btn_ReloginNoForceAuthnNSISAssuranceLevelHigh_Click(
+            object sender,
+            EventArgs e
+        )
         {
             HandleReloginNoForceAuthnAssuranceLevel("High");
         }
@@ -97,9 +135,12 @@ namespace Kombit.Samples.CH.WebsiteDemo
             var session = SessionStore.CurrentSession;
             if (session != null)
             {
-                SessionStore.CurrentSession[SessionConstants.RequestedAssuranceLevel] = "https://data.gov.dk/concept/core/nsis/loa/" + nsisAssuranceLevel;
+                SessionStore.CurrentSession[SessionConstants.RequestedAssuranceLevel] =
+                    "https://data.gov.dk/concept/core/nsis/loa/" + nsisAssuranceLevel;
             }
-            Response.Redirect("/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath);
+            Response.Redirect(
+                "/login.ashx?ReturnUrl=" + HttpContext.Current.Request.Url.AbsolutePath
+            );
         }
 
         protected void Btn_GetStsToken_Click(object sender, EventArgs e)
@@ -108,22 +149,36 @@ namespace Kombit.Samples.CH.WebsiteDemo
             var identity = Saml20Identity.Current;
             if (!identity.HasAttribute(Constants.BootstrapTokenClaimType))
             {
-                StsTokenResult.InnerHtml = "<span style='color:red'>bootstrapToken attribute not present in the current SAML assertion.</span>";
+                StsTokenResult.InnerHtml =
+                    "<span style='color:red'>bootstrapToken attribute not present in the current SAML assertion.</span>";
                 return;
             }
 
             try
             {
-                string base64Assertion = identity[Constants.BootstrapTokenClaimType][0].AttributeValue[0];
+                string base64Assertion = identity[Constants.BootstrapTokenClaimType][
+                    0
+                ].AttributeValue[0];
                 byte[] assertionBytes = Convert.FromBase64String(base64Assertion);
                 string assertionXml = Encoding.UTF8.GetString(assertionBytes);
 
-                var assertion = OIOBSTSAMLAssertionFactory.CreateOIOBSTSAMLAssertion(XElement.Parse(assertionXml));
-                var vault = new InMemoryCredentialVault(Utils.GetCertificateByThumbprint(ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]));
-                var domBuilder = new OIOBSTSAMLAssertionToIDCardRequestDOMBuilder<OIOBSTSAMLAssertion>();
+                var assertion = OIOBSTSAMLAssertionFactory.CreateOIOBSTSAMLAssertion(
+                    XElement.Parse(assertionXml)
+                );
+                var vault = new InMemoryCredentialVault(
+                    Utils.GetCertificateByThumbprint(
+                        ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]
+                    )
+                );
+                var domBuilder =
+                    new OIOBSTSAMLAssertionToIDCardRequestDOMBuilder<OIOBSTSAMLAssertion>();
                 domBuilder.ItSystemName = assertion.Issuer;
                 domBuilder.Audience = "https://sts.sosi.dk/";
-                if (assertion.BasicPrivileges != null && assertion.BasicPrivileges.Privileges != null && assertion.BasicPrivileges.Privileges.Count > 0)
+                if (
+                    assertion.BasicPrivileges != null
+                    && assertion.BasicPrivileges.Privileges != null
+                    && assertion.BasicPrivileges.Privileges.Count > 0
+                )
                 {
                     var first = assertion.BasicPrivileges.Privileges.First();
                     var key = first.Key;
@@ -135,18 +190,21 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 domBuilder.SetOIOSAMLAssertion(assertion);
 
                 var requestDoc = domBuilder.Build();
-                var assertionToIdCardRequest =
-                    OIOSAMLFactory.CreateOIOBSTSAMLAssertionToIDCardRequestModelBuilder().Build(requestDoc.Document);
+                var assertionToIdCardRequest = OIOSAMLFactory
+                    .CreateOIOBSTSAMLAssertionToIDCardRequestModelBuilder()
+                    .Build(requestDoc.Document);
 
                 var stsEndpoint = ConfigurationManager.AppSettings["sosiStsForBSTTokenExchangeUrl"];
-                var idCard = (UserIdCard)SealUtilities.SignIn(assertionToIdCardRequest, stsEndpoint);
+                var idCard = (UserIdCard)
+                    SealUtilities.SignIn(assertionToIdCardRequest, stsEndpoint);
 
                 // Persist the id card in session so the service call button can use it
                 Session["IdCard"] = idCard;
 
                 StsTokenResult.InnerHtml = string.Format(
                     "<p><strong>STS issued token (raw XML):</strong></p><pre>{0}</pre>",
-                    HttpUtility.HtmlEncode(idCard.Xassertion));
+                    HttpUtility.HtmlEncode(idCard.Xassertion)
+                );
 
                 // Show the service call button now that we have a valid token
                 Btn_CallService.Visible = true;
@@ -156,7 +214,8 @@ namespace Kombit.Samples.CH.WebsiteDemo
             {
                 StsTokenResult.InnerHtml = string.Format(
                     "<span style='color:red'><strong>Error calling STS:</strong> {0}</span>",
-                    HttpUtility.HtmlEncode(ex.Message));
+                    HttpUtility.HtmlEncode(ex.Message)
+                );
             }
         }
 
@@ -166,24 +225,33 @@ namespace Kombit.Samples.CH.WebsiteDemo
             var idCard = Session["IdCard"] as UserIdCard;
             if (idCard == null)
             {
-                ServiceCallResult.InnerHtml = "<span style='color:red'>No issued token in session. Please click 'Exchange BST Token for SOSI ID Card' button first.</span>";
+                ServiceCallResult.InnerHtml =
+                    "<span style='color:red'>No issued token in session. Please click 'Exchange BST Token for SOSI ID Card' button first.</span>";
                 return;
             }
             var serviceEndpoint = ConfigurationManager.AppSettings["ntsServiceEndpoint"];
-            var serviceEndpointDnsIdentity = ConfigurationManager.AppSettings["ntsServiceEndpointDnsIdentity"];
+            var serviceEndpointDnsIdentity = ConfigurationManager.AppSettings[
+                "ntsServiceEndpointDnsIdentity"
+            ];
             try
             {
-                string response = ServiceCaller.Invoke(idCard, serviceEndpoint, serviceEndpointDnsIdentity);
+                string response = ServiceCaller.Invoke(
+                    idCard,
+                    serviceEndpoint,
+                    serviceEndpointDnsIdentity
+                );
 
                 ServiceCallResult.InnerHtml = string.Format(
                     "<p><strong style='color:green'>Service call succeeded:</strong></p><pre>{0}</pre>",
-                    HttpUtility.HtmlEncode(response));
+                    HttpUtility.HtmlEncode(response)
+                );
             }
             catch (Exception ex)
             {
                 ServiceCallResult.InnerHtml = string.Format(
                     "<p><strong style='color:red'>Service call failed:</strong></p><pre>{0}</pre>",
-                    HttpUtility.HtmlEncode(ex.ToString()));
+                    HttpUtility.HtmlEncode(ex.ToString())
+                );
             }
         }
 
@@ -191,8 +259,12 @@ namespace Kombit.Samples.CH.WebsiteDemo
         {
             // Example of logging required by the requirements SLO1 ("Id of internal account that is matched to SAML Assertion")
             // Since FormsAuthentication is used in this sample, the user name to log can be found in context.User.Identity.Name
-            AuditLogging.logEntry(Direction.OUT, Operation.LOGOUTREQUEST,
-                "ServiceProvider logoff requested, local user id: " + HttpContext.Current.User.Identity.Name);
+            AuditLogging.logEntry(
+                Direction.OUT,
+                Operation.LOGOUTREQUEST,
+                "ServiceProvider logoff requested, local user id: "
+                    + HttpContext.Current.User.Identity.Name
+            );
             Response.Redirect("logout.ashx");
         }
 
@@ -222,7 +294,6 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
             var profile = ConfigurationManager.AppSettings["Profile"];
 
-
             StringBuilder missingClaimTypes = new StringBuilder();
 
             if (!current.HasAttribute("https://data.gov.dk/model/core/specVersion"))
@@ -232,7 +303,9 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
             if (!current.HasAttribute("https://data.gov.dk/model/core/eid/privilegesIntermediate"))
             {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/privilegesIntermediate,");
+                missingClaimTypes.Append(
+                    "https://data.gov.dk/model/core/eid/privilegesIntermediate,"
+                );
             }
 
             if (!current.HasAttribute("https://data.gov.dk/concept/core/nsis/loa"))
@@ -240,7 +313,10 @@ namespace Kombit.Samples.CH.WebsiteDemo
                 missingClaimTypes.Append("https://data.gov.dk/concept/core/nsis/loa,");
             }
 
-            if (profile != "KOMBIT_WITHOUT_PERSONAL_DATA" && !current.HasAttribute("https://data.gov.dk/model/core/eid/email"))
+            if (
+                profile != "KOMBIT_WITHOUT_PERSONAL_DATA"
+                && !current.HasAttribute("https://data.gov.dk/model/core/eid/email")
+            )
             {
                 missingClaimTypes.Append("https://data.gov.dk/model/core/eid/email,");
             }
@@ -252,7 +328,9 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
             if (!current.HasAttribute("https://data.gov.dk/model/core/eid/professional/orgName"))
             {
-                missingClaimTypes.Append("https://data.gov.dk/model/core/eid/professional/orgName,");
+                missingClaimTypes.Append(
+                    "https://data.gov.dk/model/core/eid/professional/orgName,"
+                );
             }
 
             if (!current.HasAttribute("dk:gov:saml:attribute:KombitSpecVer"))
@@ -263,7 +341,12 @@ namespace Kombit.Samples.CH.WebsiteDemo
             if (missingClaimTypes.Length > 0)
             {
                 var errorMessage = missingClaimTypes.ToString().TrimEnd(',');
-                throw new Exception(string.Format("Saml assertion does not meet Kombit profile. It is missing following claim types: {0}", errorMessage));
+                throw new Exception(
+                    string.Format(
+                        "Saml assertion does not meet Kombit profile. It is missing following claim types: {0}",
+                        errorMessage
+                    )
+                );
             }
         }
     }

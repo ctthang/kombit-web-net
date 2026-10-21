@@ -22,10 +22,14 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
             {
                 System.Diagnostics.Trace.WriteLine(
                     logEvent.RenderMessage(),
-                    "STS [" + logEvent.Level + "]");
+                    "STS [" + logEvent.Level + "]"
+                );
 
                 if (logEvent.Exception != null)
-                    System.Diagnostics.Trace.WriteLine(logEvent.Exception.ToString(), "STS [Exception]");
+                    System.Diagnostics.Trace.WriteLine(
+                        logEvent.Exception.ToString(),
+                        "STS [Exception]"
+                    );
             }
         }
     }

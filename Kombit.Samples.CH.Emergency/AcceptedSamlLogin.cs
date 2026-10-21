@@ -16,11 +16,34 @@ namespace Kombit.Samples.CH.Emergency
         public long RecordExpires { get; set; }
         public long SessionExpires { get; set; }
         public bool Reserved { get; set; }
-        public string AccountKey { get { return Account(Issuer, Subject, Format, NameQualifier, SpNameQualifier); } }
-        public static string Account(string issuer, string subject, string format, string qualifier, string spQualifier)
+        public string AccountKey
         {
-            return Wire.Hash(new JArray(issuer, subject, format, qualifier, spQualifier).ToString(Formatting.None));
+            get { return Account(Issuer, Subject, Format, NameQualifier, SpNameQualifier); }
         }
-        public JObject Reference() { return new JObject { ["protocol"] = "saml", ["issuer"] = Issuer, ["token_reference"] = AssertionId }; }
+
+        public static string Account(
+            string issuer,
+            string subject,
+            string format,
+            string qualifier,
+            string spQualifier
+        )
+        {
+            return Wire.Hash(
+                new JArray(issuer, subject, format, qualifier, spQualifier).ToString(
+                    Formatting.None
+                )
+            );
+        }
+
+        public JObject Reference()
+        {
+            return new JObject
+            {
+                ["protocol"] = "saml",
+                ["issuer"] = Issuer,
+                ["token_reference"] = AssertionId,
+            };
+        }
     }
 }

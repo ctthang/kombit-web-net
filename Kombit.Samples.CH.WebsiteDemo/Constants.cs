@@ -7,6 +7,7 @@ namespace Kombit.Samples.CH.WebsiteDemo
 {
     public class Constants
     {
-        public const string BootstrapTokenClaimType = "https://data.gov.dk/model/core/eid/bootstrapToken";
+        public const string BootstrapTokenClaimType =
+            "https://data.gov.dk/model/core/eid/bootstrapToken";
     }
 }

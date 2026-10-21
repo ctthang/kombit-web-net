@@ -14,12 +14,29 @@ namespace Kombit.Samples.CH.Emergency.Tests
             {
                 string operatorId = fixture.Access.SignInOperator(fixture.OperatorSecret);
                 fixture.Access.SetAcceptance(operatorId, true, 60);
-                using (FileStream held = new FileStream(Path.Combine(fixture.Settings.StateDirectory, "registry.bin"), FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (
+                    FileStream held = new FileStream(
+                        Path.Combine(fixture.Settings.StateDirectory, "registry.bin"),
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read
+                    )
+                )
                 {
                     // Act
-                    Assert.ThrowsExactly<IOException>(() => fixture.Access.SetAcceptance(operatorId, false, 0));
+                    Assert.ThrowsExactly<IOException>(() =>
+                        fixture.Access.SetAcceptance(operatorId, false, 0)
+                    );
                     // Assert
-                    Assert.AreEqual(503, Assert.ThrowsExactly<EmergencyFailure>(() => { bool allowed = fixture.Access.Accepting; }).StatusCode);
+                    Assert.AreEqual(
+                        503,
+                        Assert
+                            .ThrowsExactly<EmergencyFailure>(() =>
+                            {
+                                bool allowed = fixture.Access.Accepting;
+                            })
+                            .StatusCode
+                    );
                 }
             }
         }

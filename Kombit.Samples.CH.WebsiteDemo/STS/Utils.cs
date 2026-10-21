@@ -16,11 +16,17 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
                 certStore.Open(OpenFlags.ReadOnly);
 
                 // Find the certificate that matches the thumbprint.
-                var certCollection = certStore.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, false);
+                var certCollection = certStore.Certificates.Find(
+                    X509FindType.FindByThumbprint,
+                    thumbprint,
+                    false
+                );
 
                 if (certCollection.Count == 0)
                 {
-                    throw new InvalidOperationException($"The specified certificate with thumbprint {thumbprint} was not found!");
+                    throw new InvalidOperationException(
+                        $"The specified certificate with thumbprint {thumbprint} was not found!"
+                    );
                 }
 
                 // Check to see if our certificate was added to the collection. If not return null else return certificate.
