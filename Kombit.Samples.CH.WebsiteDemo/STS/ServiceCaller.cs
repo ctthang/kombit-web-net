@@ -1,52 +1,13 @@
 using System;
 using System.ServiceModel;
-using System.ServiceModel.Channels;
 using dk.nsi.seal;
 using dk.nsi.seal.dgwstypes;
+using Kombit.Samples.CH.WebsiteDemo.NtsServiceReference;
 using static dk.nsi.seal.MessageHeaders.IdCardMessageHeader;
 using static dk.nsi.seal.MessageHeaders.XmlMessageHeader;
 
 namespace Kombit.Samples.CH.WebsiteDemo.STS
 {
-    // -------------------------------------------------------------------------
-    // WCF contract derived from WSDL at:
-    //   http://test1.ekstern-test.nspop.dk:8080/nts/service-01172024?wsdl
-    //
-    // targetNamespace : http://web.nts.nsp.nsi.dk/
-    // operation       : invoke
-    // soapAction      : http://nspop.dk/nts/2024/01#invoke
-    // style           : document / literal
-    // -------------------------------------------------------------------------
-
-    /// <summary>Request message for the NTS <c>invoke</c> operation (empty body).</summary>
-    [System.ServiceModel.MessageContract(
-        WrapperName = "invoke",
-        WrapperNamespace = "http://web.nts.nsp.nsi.dk/",
-        IsWrapped = true
-    )]
-    public class NtsInvokeRequest { }
-
-    /// <summary>Response message for the NTS <c>invoke</c> operation (empty OK body).</summary>
-    [System.ServiceModel.MessageContract(
-        WrapperName = "OK",
-        WrapperNamespace = "http://web.nts.nsp.nsi.dk/",
-        IsWrapped = true
-    )]
-    public class NtsInvokeResponse { }
-
-    /// <summary>WCF service contract matching NtsPortType in the WSDL.</summary>
-    [ServiceContract(Namespace = "http://web.nts.nsp.nsi.dk/")]
-    public interface INtsService
-    {
-        [OperationContract(Action = "http://nspop.dk/nts/2024/01#invoke", ReplyAction = "*")]
-        NtsInvokeResponse Invoke(NtsInvokeRequest request);
-    }
-
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Calls the NTS service endpoint using a DGWS <see cref="IdCard"/>.
-    /// </summary>
     public static class ServiceCaller
     {
         /// <summary>
@@ -91,7 +52,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
 
             // SealEndpointBehavior checks the response for DGWS fault details and
             // throws a descriptive exception when errors are found.
-            var factory = new ChannelFactory<INtsService>(binding, endpointAddress);
+            var factory = new ChannelFactory<NtsPortType>(binding, endpointAddress);
             factory.Endpoint.EndpointBehaviors.Add(new SealEndpointBehavior());
 
             // DGWS header: SecurityLevel 4 = MOCES-authenticated user
@@ -102,7 +63,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
                 Linking = new Linking { MessageID = Guid.NewGuid().ToString("D") },
             };
 
-            INtsService channel = factory.CreateChannel();
+            NtsPortType channel = factory.CreateChannel();
             try
             {
                 using (new OperationContextScope((IContextChannel)channel))
@@ -113,7 +74,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
                     OperationContext.Current.OutgoingMessageHeaders.Add(IdCardHeader(idCard));
                     OperationContext.Current.OutgoingMessageHeaders.Add(XmlHeader(dgwsHeader));
 
-                    NtsInvokeResponse response = channel.Invoke(new NtsInvokeRequest());
+                    invokeResponse response = channel.invoke(new invokeRequest(new invoke()));
                     return response != null ? "OK" : "(empty response)";
                 }
             }

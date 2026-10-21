@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
@@ -17,7 +17,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
             bstBuilder.SigningAlgorithm = SealSignedXml.SigningAlgorithm.Sha256;
             bstBuilder.SigningVault = new InMemoryCredentialVault(
                 Utils.GetCertificateByThumbprint(
-                    ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]
+                    ConfigurationManager.AppSettings["sosiRequestSigningCertificate"]
                 )
             );
             bstBuilder.Issuer = "https://i-seb.dkseb.dk/runtime/";
@@ -25,7 +25,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
             bstBuilder.NameId =
                 "C=DK, OID.2.5.4.97=NTRDK-33257872, O=Sundhedsdatastyrelsen, SERIALNUMBER=UI:DK-O:G:4ebe6630-e2ee-483e-9a46-71caff105239, CN=signing-i-seb.dkseb.dk";
             bstBuilder.HolderOfKeyCertificate = Utils.GetCertificateByThumbprint(
-                ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]
+                ConfigurationManager.AppSettings["sosiRequestSigningCertificate"]
             );
             bstBuilder.NotOnOrAfter = DateTime.UtcNow.AddHours(8);
             bstBuilder.Cvr = "33257872";
@@ -46,7 +46,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
             bstBuilder.SigningAlgorithm = SealSignedXml.SigningAlgorithm.Sha256;
             bstBuilder.SigningVault = new InMemoryCredentialVault(
                 Utils.GetCertificateByThumbprint(
-                    ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]
+                    ConfigurationManager.AppSettings["sosiRequestSigningCertificate"]
                 )
             );
             bstBuilder.Issuer = "https://i-seb.dkseb.dk/runtime/";
@@ -54,7 +54,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.STS
             bstBuilder.NameId =
                 "C=DK, OID.2.5.4.97=NTRDK-33257872, O=Sundhedsdatastyrelsen, SERIALNUMBER=UI:DK-O:G:4ebe6630-e2ee-483e-9a46-71caff105239, CN=signing-i-seb.dkseb.dk";
             bstBuilder.HolderOfKeyCertificate = Utils.GetCertificateByThumbprint(
-                ConfigurationManager.AppSettings["sisoRequestSigningCertificate"]
+                ConfigurationManager.AppSettings["sosiRequestSigningCertificate"]
             );
             bstBuilder.NotOnOrAfter = DateTime.UtcNow.AddHours(8);
             bstBuilder.Cvr = "33257872";
