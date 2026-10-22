@@ -3,9 +3,38 @@
     const page = document.getElementById('saml-emergency');
     if (!page) return;
     const token = document.getElementById('csrf').value;
-    const show = text => {
-        document.getElementById('status').textContent = text;
+    const show = (text, tone) => {
+        const status = document.getElementById('status');
+        status.dataset.tone = tone || 'info';
+        status.textContent = text;
     };
+    const messages = {
+        acceptance_off: 'Emergency acceptance is off. A local operator must enable it first.',
+        csrf_or_origin_rejected: 'The request was rejected. Reload the page and try again.',
+        https_origin_required: 'Emergency access requires the configured HTTPS address.',
+        key_proof_rejected: 'The key check was rejected.',
+        local_policy_denied: 'Local policy does not allow this action.',
+        new_normal_login_required:
+            'A new normal login is required. Use "Get a new normal login" first.',
+        normal_login_required: 'A normal login is required for this action.',
+        proof_expired: 'The key check took too long. Try again.',
+        registration_expired: 'Registration took too long. Try again.',
+        state_changed_retry: 'The state changed while working. Try again.',
+    };
+    function describe(code) {
+        if (messages[code]) return messages[code];
+        if (/^[a-z_]+$/.test(code)) {
+            const words = code.replace(/_/g, ' ');
+            return words.charAt(0).toUpperCase() + words.slice(1) + '.';
+        }
+        return code;
+    }
+    function element(tag, className, content) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (content != null) node.textContent = content;
+        return node;
+    }
 
     const traceKey = 'saml-emergency-issuer-results-v1';
     let callHistory = [];
@@ -99,20 +128,23 @@
         });
         recordIssuerCalls(response);
         const value = await response.json();
-        if (!response.ok) throw new Error(value.error || 'Request failed');
+        if (!response.ok) throw new Error(describe(value.error || 'Request failed'));
         return value;
     }
     function action(operation) {
         return async function (event) {
             if (event) event.preventDefault();
             try {
-                show('Working…');
+                show('Working…', 'busy');
+                const status = document.getElementById('status');
                 await operation();
+                if (status.dataset.tone === 'busy') show('');
             } catch (error) {
                 show(
                     error.name === 'NotAllowedError'
                         ? 'Key check cancelled. The credential is not ready.'
                         : error.message || 'Operation failed.',
+                    'error',
                 );
             }
         };
@@ -184,7 +216,7 @@
         if (login) {
             location.assign(result.redirect);
         } else {
-            show('Ready. This browser and key can log in while local acceptance is on.');
+            show('Ready. This browser and key can log in while local acceptance is on.', 'success');
             await displayKeys();
         }
     }
@@ -200,7 +232,7 @@
         const saved = (await storage()).find(item => item.ec_id === entry.ec_id);
         if (!saved || saved.emergency_credential !== entry.emergency_credential)
             throw new Error('Storage read-back failed. The credential is not ready.');
-        show('Stored, pending activation. Check your key again.');
+        show('Stored, pending activation. Check your key again.', 'busy');
         await prove(saved, false);
     }
     connect('register', async () => {
@@ -236,13 +268,19 @@
             }
         }
     });
-    function control(label, work) {
-        const button = document.createElement('button');
+    function control(label, work, variant) {
+        const button = element('button', variant || 'secondary', label);
         button.type = 'button';
-        button.textContent = label;
         button.addEventListener('click', action(work));
         return button;
     }
+    const statusLabels = {
+        pending: 'Pending check',
+        active: 'Active',
+        replaced: 'Replaced',
+        blocked: 'Blocked',
+        expired: 'Expired',
+    };
     async function displayKeys() {
         const list = document.getElementById('saved-keys');
         if (!list) return;
@@ -252,67 +290,113 @@
         for (const entry of saved) {
             const current = state && state.credentials.find(item => item.ec_id === entry.ec_id);
             if (state && !current) continue;
-            const row = document.createElement('li');
-            row.textContent =
-                'Key ' +
-                entry.binding_id.slice(-6) +
-                ' — ' +
-                (current ? current.status : 'stored; checked by the server on use') +
-                ' — expires ' +
-                new Date(entry.expires_at * 1000).toLocaleString() +
-                ' ';
+            const expired = entry.expires_at * 1000 <= Date.now();
+            const status = current ? current.status : expired ? 'expired' : 'stored';
+            const row = element('li', 'key');
+            const head = element('div', 'key-head');
+            head.append(
+                element('span', 'key-name', 'Key …' + entry.binding_id.slice(-6)),
+                element(
+                    'span',
+                    'badge ' + status,
+                    statusLabels[status] || (status === 'stored' ? 'Stored' : status),
+                ),
+            );
+            if (current && current.renew_soon && status === 'active')
+                head.append(element('span', 'badge pending', 'Renew soon'));
+            row.append(head);
+            row.append(
+                element(
+                    'span',
+                    'key-meta',
+                    (expired ? 'Expired ' : 'Expires ') +
+                        new Date(entry.expires_at * 1000).toLocaleString() +
+                        (state || expired ? '' : ' · checked by the server on use'),
+                ),
+            );
+            const actions = element('div', 'actions');
             if (!state) {
-                if (entry.expires_at * 1000 > Date.now())
-                    row.append(control('Log in with this key', () => prove(entry, true)));
+                if (!expired)
+                    actions.append(
+                        control('Log in with this key', () => prove(entry, true), 'primary'),
+                    );
             } else {
                 if (current.status === 'pending')
-                    row.append(control('Confirm stored credential', () => prove(entry, false)));
+                    actions.append(
+                        control('Confirm stored credential', () => prove(entry, false), 'primary'),
+                    );
                 if (current.status === 'active' && state.can_prepare)
-                    row.append(
+                    actions.append(
                         control('Renew', async () =>
                             keep(await send('renew', { binding_id: entry.binding_id })),
                         ),
                     );
-                row.append(
-                    control('Remove key locally', async () => {
-                        await send('remove', { binding_id: entry.binding_id });
-                        show('Key blocked locally. Failed issuer reports remain queued.');
-                        await displayKeys();
-                    }),
+                actions.append(
+                    control(
+                        'Remove key locally',
+                        async () => {
+                            if (!confirm('Remove key …' + entry.binding_id.slice(-6) + '?')) return;
+                            await send('remove', { binding_id: entry.binding_id });
+                            show(
+                                'Key blocked locally. Failed issuer reports remain queued.',
+                                'success',
+                            );
+                            await displayKeys();
+                        },
+                        'danger',
+                    ),
                 );
-                const id = document.createElement('p');
-                id.textContent = 'Binding ID: ' + entry.binding_id;
+                const id = element('span', 'key-meta', 'Binding ID: ');
+                id.append(element('code', null, entry.binding_id));
                 row.append(id);
             }
+            if (actions.children.length) row.append(actions);
             list.append(row);
         }
-        if (!list.children.length) {
-            const empty = document.createElement('li');
-            empty.textContent =
-                'This browser has no matching prepared credential. Use normal login to prepare.';
-            list.append(empty);
-        }
+        if (!list.children.length)
+            list.append(
+                element(
+                    'li',
+                    'empty',
+                    'This browser has no matching prepared credential. Use normal login to prepare.',
+                ),
+            );
+    }
+    function stat(label, value) {
+        const item = element('div');
+        const term = element('dt', null, label);
+        const detail = element('dd');
+        detail.append(value);
+        item.append(term, detail);
+        return item;
     }
     async function operatorState() {
         const state = await send('operator-status');
         document.getElementById('operator-panel').hidden = false;
-        document.getElementById('operator-status').textContent =
-            'Acceptance: ' +
-            (state.accepting ? 'on' : 'off') +
-            '. Last successful sync: ' +
-            (state.last_poll ? new Date(state.last_poll * 1000).toLocaleString() : 'never') +
-            '. Queued removals: ' +
-            state.queued_removals;
+        document
+            .getElementById('operator-status')
+            .replaceChildren(
+                stat(
+                    'Emergency acceptance',
+                    element(
+                        'span',
+                        'badge ' + (state.accepting ? 'on' : 'off'),
+                        state.accepting ? 'On' : 'Off',
+                    ),
+                ),
+                stat(
+                    'Last successful sync',
+                    state.last_poll ? new Date(state.last_poll * 1000).toLocaleString() : 'Never',
+                ),
+                stat('Queued removals', String(state.queued_removals)),
+            );
         const list = document.getElementById('events');
         list.replaceChildren();
         state.audit
             .slice()
             .reverse()
-            .forEach(value => {
-                const row = document.createElement('li');
-                row.textContent = value;
-                list.append(row);
-            });
+            .forEach(value => list.append(element('li', null, value)));
+        if (!list.children.length) list.append(element('li', null, 'No events recorded yet.'));
     }
     connect(
         'operator-form',
@@ -331,12 +415,12 @@
             minutes: Number(document.getElementById('duration').value),
         });
         await operatorState();
-        show('Acceptance enabled.');
+        show('Acceptance enabled.', 'success');
     });
     connect('disable', async () => {
         await send('acceptance', { enabled: false, minutes: 0 });
         await operatorState();
-        show('Acceptance stopped. Existing emergency sessions are invalid.');
+        show('Acceptance stopped. Existing emergency sessions are invalid.', 'success');
     });
     connect('block', async () => {
         await send('block', {
@@ -344,12 +428,12 @@
             whole_account: document.getElementById('block-account').checked,
         });
         await operatorState();
-        show('Local block applied.');
+        show('Local block applied.', 'success');
     });
     connect('sync', async () => {
         await send('poll');
         await operatorState();
-        show('Online synchronization completed.');
+        show('Online synchronization completed.', 'success');
     });
     connect('operator-exit', async () => {
         await send('operator-logout');
