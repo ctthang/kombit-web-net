@@ -31,7 +31,7 @@ For the local dev520/kombitspnew deployment, use the [step-by-step setup guide a
 
    ```xml
    <add key="EmergencyCredential.Enabled" value="true" />
-   <add key="EmergencyCredential.SettingsFile" value="C:\ProgramData\SafewhereSamples\SamlEmergency\settings.json" />
+   <add key="EmergencyCredential.SettingsFile" value="C:\ProgramData\SafewhereSamples\SamlEmergency\emergency-settings.json" />
    <add key="EmergencyCredential.StateDirectory" value="C:\ProgramData\SafewhereSamples\SamlEmergency\state" />
    <add key="aspnet:UseTaskFriendlySynchronizationContext" value="true" />
    ```
@@ -105,7 +105,7 @@ Deploy the updated issuer and sample, remove `PreserveNormalClaims`, `ClaimTypes
 
 **Remove key locally** deletes the binding and all associated credential versions from the client registry and this browser's IndexedDB, including renewed/replaced copies. It ends existing sessions for that binding and rejects replay of its previously issued credentials. The row disappears rather than becoming Blocked. An offline removal is immediately effective and survives restart; only the binding identifier needed to retry issuer revocation is retained in the internal queue. Other browsers may retain stale copies, but the server rejects them. This removes the application registration; it does not erase a hardware authenticator's internal key through WebAuthn.
 
-If removal succeeds on the server but browser cleanup fails or the response is lost, open the emergency-login page and use **Forget browser copy** for that key. This clears all its versions from this browser without contacting the server; it does not revoke an otherwise valid server registration.
+The browser-only **Forget browser copy** action has been removed: it could strand an active issuer registration and prevent the same authenticator from being prepared again. If browser storage is lost, obtain a fresh normal login and open the preparation page. Registered keys without a browser copy are now shown as **Browser copy missing**, with **Remove key locally** available. Remove the old registration, let issuer revocation synchronize, and then prepare the authenticator again. Removal ends that binding's emergency sessions in every browser. If the client registry itself was lost (not only browser storage), an issuer administrator must revoke the orphaned binding. Clearing browser storage alone never unregisters a key.
 
 The preparation page shows exactly one next action: **Prepare this browser** while a fresh unused normal-login record is eligible, or **Get a new normal login for preparation or renewal** otherwise. Starting preparation/renewal consumes that record, so the page switches back to the login action. Pending credentials can still be confirmed using their own key-check control.
 
@@ -120,3 +120,24 @@ No request bodies, query values, cookies, tokens, credentials, API keys, or clai
 ## Authenticator policy compatibility
 
 The current issuer and both clients use `poc-up`: presence is required, verification is preferred, and valid backup-eligible/backed-up passkeys are accepted. A backup-state bit without backup eligibility is rejected. Signature, origin/RP, one-use challenge, credential ownership, and counter checks remain enforced. Credentials labeled with the older `poc-uv-nonbackup` policy must be renewed to the current policy; they are not silently reinterpreted.
+
+
+## Single-tenant configuration layout
+
+Use `C:\ProgramData\SafewhereSamples\SamlEmergency` directly. Do not add a tenant subfolder. Keep these files outside the deployed website and source control:
+
+```text
+SamlEmergency/
+  emergency-settings.json
+  decryption-key.bin
+  encryption-public.jwk.json
+  issuer-signing-keys.json
+  state/
+  backups/
+```
+
+SAML uses a flat JSON object. Set `EmergencyCredential.SettingsFile` in deployed `Web.config` to the root `emergency-settings.json` and `EmergencyCredential.StateDirectory` to its `state` directory. The ASP.NET machine key stays in protected IIS/Web.config configuration; it is not an ASP.NET Core `protection` folder.
+
+To migrate an existing installation, stop the client pool, back up its settings and protected state, and move the existing files rather than generating new keys. Update every absolute path in the settings and the deployed configuration, then restart the pool. Preserve directory ACLs and the existing machine/data-protection keys. Do not reset state, change the emergency audience, or run the key-generation script over the existing installation. Keep old files only in `backups`, not as a second live configuration. No Identify redeployment or issuer configuration change is needed for this directory move.
+
+Regression check: prepare a key, simulate losing its browser storage, then perform a fresh normal login. The preparation page must show one **Browser copy missing** row per binding, including when it has several renewed versions. **Remove key locally** must report revocation to Identify and remove the row. Only then enroll the same authenticator again. A failed removal request must leave browser data untouched. The emergency-login page must never offer browser-only deletion.

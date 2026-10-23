@@ -403,9 +403,28 @@
                 id.append(element('code', null, entry.binding_id));
                 row.append(id);
             }
-            if (page.dataset.mode === 'login') actions.append(control('Forget browser copy', async () => { if (!confirm('Forget all copies of this key in this browser? This does not revoke its server registration.')) return; await deleteStoredBinding(entry.binding_id); show('Browser copies removed. Server registration was not changed.', 'success'); await displayKeys(); }));
             if (actions.children.length) row.append(actions);
             list.append(row);
+        }
+        // Status belongs to the authenticated account, even after browser storage is cleared.
+        if (state) {
+            const missing = new Map();
+            for (const entry of state.credentials) {
+                if (!saved.some(record => record.binding_id === entry.binding_id && state.credentials.some(item => item.ec_id === record.ec_id))) missing.set(entry.binding_id, entry);
+            }
+            for (const entry of missing.values()) {
+                const row = element('li', 'key');
+                row.append(element('span', 'key-name', 'Key …' + entry.binding_id.slice(-6)),
+                    element('p', 'key-meta', 'Browser copy missing. Remove this registration before preparing the same authenticator again. This also ends its emergency sessions in other browsers.'));
+                row.append(control('Remove key locally', async () => {
+                    if (!confirm('Remove registration for key …' + entry.binding_id.slice(-6) + ' and end its emergency sessions?')) return;
+                    await send('remove', { binding_id: entry.binding_id });
+                    await deleteStoredBinding(entry.binding_id);
+                    show('Registration removed locally. If Identify is unavailable, its revocation is queued; wait for it to synchronize before preparing this key again.', 'success');
+                    await displayKeys();
+                }, 'danger'));
+                list.append(row);
+            }
         }
         if (!list.children.length)
             list.append(
