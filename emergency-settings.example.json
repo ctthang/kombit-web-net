@@ -9,6 +9,6 @@
   "PrivateEncryptionKeyFile": "C:\\ProgramData\\SafewhereSamples\\SamlEmergency\\decryption-key.bin",
   "EncryptionKeyId": "saml-emergency-encryption",
   "InitialSigningKeysFile": "C:\\ProgramData\\SafewhereSamples\\SamlEmergency\\issuer-signing-keys.json",
-  "BackendSecretVariable": "SAML_EMERGENCY_ISSUER_KEY",
+  "ApiKey": "saml-poc-key",
   "SessionMinutes": 480
 }

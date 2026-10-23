@@ -72,8 +72,8 @@ namespace Kombit.Samples.CH.Emergency
                     throw new EmergencyFailure(503, "login_capacity");
                 }
                 login.Handle = Wire.RandomId();
-                login.RecordExpires = Math.Min(login.RecordExpires, Now + 600);
-                login.SessionExpires = Now + 28800;
+                login.RecordExpires = Math.Min(login.RecordExpires, Now + 86400);
+                login.SessionExpires = Now + 172800;
                 normalLogins.Add(login.Handle, login);
                 return login.Handle;
             }
@@ -641,6 +641,11 @@ namespace Kombit.Samples.CH.Emergency
                         throw new EmergencyFailure(404, "key_not_found");
                     }
                     BlockKey(data, binding);
+                    foreach (JProperty credential in ((JObject)data["credentials"]).Properties().Where(property => (string)property.Value["binding"] == binding).ToArray())
+                    {
+                        credential.Remove();
+                    }
+                    ((JObject)data["keys"]).Remove(binding);
                     JArray queue = (JArray)data["pending_removals"];
                     if (!queue.Values<string>().Contains(binding))
                     {

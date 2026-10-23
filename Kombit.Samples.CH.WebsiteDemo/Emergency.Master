@@ -34,14 +34,14 @@
 <% if (view.Mode == "prepare") { %>
     <section class="card">
         <h2>Prepare this browser</h2>
-        <p class="lead">Use a key with user verification and no passkey backup. Preparation has three parts: registration, browser storage, and a separate key check.</p>
+        <p class="lead">Use a security key or passkey. User presence is required; user verification is preferred. Preparation has three parts: registration, browser storage, and a separate key check.</p>
         <ol class="steps">
-            <li>
+            <li id="normal-login-step" <% if (view.CanPrepare) { %>hidden<% } %>>
                 <span class="step-title">Start from a recent normal login</span>
                 <span class="hint">Preparation and renewal require a fresh normal login.</span>
-                <a class="button secondary" href="<%= ResolveUrl("~/login.ashx?ReturnUrl=Emergency.aspx") %>">Get a new normal login</a>
+                <a class="button secondary" href="<%= ResolveUrl("~/login.ashx?ReturnUrl=Emergency.aspx") %>">Get a new normal login for preparation or renewal</a>
             </li>
-            <li>
+            <li id="prepare-step" <% if (!view.CanPrepare) { %>hidden<% } %>>
                 <span class="step-title">Register and store a key</span>
                 <span class="hint"><% if (view.CanPrepare) { %>Your browser will ask for the key twice: once to register it, once to confirm it.<% } else { %>Not available yet. Get a new normal login first.<% } %></span>
                 <button id="register" class="primary" type="button" <% if (!view.CanPrepare) { %>disabled<% } %>>Prepare this browser</button>

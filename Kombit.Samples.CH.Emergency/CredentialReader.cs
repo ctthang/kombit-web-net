@@ -125,7 +125,7 @@ namespace Kombit.Samples.CH.Emergency
                     || nbfTime > now
                     || expires <= now
                     || expires <= issued
-                    || expires - issued > 1209600
+                    || expires - issued > 2592000
                 )
                 {
                     throw Wire.Invalid();
@@ -137,7 +137,7 @@ namespace Kombit.Samples.CH.Emergency
                     || Wire.String(source, "issuer") != settings.NormalSamlIssuer
                     || Wire.String(webauthn, "rp_id") != settings.RpId
                     || Wire.String(webauthn, "origin") != settings.Origin
-                    || Wire.String(webauthn, "hardware_policy") != "poc-uv-nonbackup"
+                    || Wire.String(webauthn, "hardware_policy") != "poc-up"
                 )
                 {
                     throw Wire.Invalid();
@@ -146,7 +146,7 @@ namespace Kombit.Samples.CH.Emergency
                     count = Wire.Number(webauthn, "sign_count");
                 if (
                     accepted > issued
-                    || accepted < issued - 600
+                    || accepted < issued - 86400
                     || count < 0
                     || count > uint.MaxValue
                 )

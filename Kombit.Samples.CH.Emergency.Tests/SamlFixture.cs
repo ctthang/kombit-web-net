@@ -206,7 +206,7 @@ namespace Kombit.Samples.CH.Emergency.Tests
                 client["crossOrigin"] = true;
             if (mutation == "topOrigin")
                 client["topOrigin"] = "https://wrong.invalid";
-            byte flags =
+            byte flags = mutation == "invalid-backup-state" ? (byte)21 :
                 mutation == "up" ? (byte)4
                 : mutation == "uv" ? (byte)1
                 : mutation == "backup" ? (byte)13
@@ -292,7 +292,7 @@ namespace Kombit.Samples.CH.Emergency.Tests
                     ["user_handle"] = UserHandle,
                     ["rp_id"] = Settings.RpId,
                     ["origin"] = Settings.Origin,
-                    ["hardware_policy"] = "poc-uv-nonbackup",
+                    ["hardware_policy"] = "poc-up",
                     ["cose_alg"] = useEc ? -7 : -257,
                     ["sign_count"] = 0,
                 },
@@ -362,7 +362,7 @@ namespace Kombit.Samples.CH.Emergency.Tests
                     payload["exp"] = now - 1;
                     break;
                 case "lifetime":
-                    payload["exp"] = now + 1209601;
+                    payload["exp"] = now + 2592001;
                     break;
                 case "profile":
                     payload["profile_version"] = "other";

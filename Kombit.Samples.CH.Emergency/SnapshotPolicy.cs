@@ -15,36 +15,8 @@ namespace Kombit.Samples.CH.Emergency
                 string type = (string)source["type"],
                     value = (string)source["value"],
                     lower = type.ToLowerInvariant();
-                if (
-                    lower.StartsWith("emergency", StringComparison.Ordinal)
-                    || lower.StartsWith("local_", StringComparison.Ordinal)
-                    || lower.Contains("token")
-                    || lower.Contains("bootstrap")
-                    || lower.Contains("assurance")
-                    || lower.Contains("/loa")
-                    || new[]
-                    {
-                        "http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationmethod",
-                        "http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationinstant",
-                        "http://schemas.microsoft.com/claims/authnmethodsreferences",
-                        "http://schemas.microsoft.com/claims/authnclassreference",
-                        "acr",
-                        "amr",
-                        "sid",
-                        "sub",
-                        "iss",
-                        "aud",
-                        "jti",
-                        "iat",
-                        "nbf",
-                        "exp",
-                        "auth_time",
-                        "session_state",
-                    }.Contains(lower)
-                )
-                {
-                    continue;
-                }
+                // Preserve normal claims while reserving local session-control names.
+                if (lower.StartsWith("emergency", StringComparison.Ordinal) || lower.StartsWith("local_", StringComparison.Ordinal)) { continue; }
                 yield return new Claim(type, value, (string)source["value_type"]);
             }
         }

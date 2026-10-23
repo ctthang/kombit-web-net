@@ -23,13 +23,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
             object[] issuerCalls = null
         )
         {
-            string reference = context == null ? null : context.Items[ReferenceKey] as string;
-            if (reference == null)
-            {
-                reference = Guid.NewGuid().ToString("N");
-                if (context != null)
-                    context.Items[ReferenceKey] = reference;
-            }
+            string reference = Reference(context);
             try
             {
                 ILog logger = LogManager.GetLogger(typeof(EmergencyDiagnostics));
@@ -67,6 +61,36 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 catch (Exception) { }
             }
             return reference;
+        }
+
+
+        internal static string Reference(HttpContext context)
+        {
+            string reference = context == null ? null : context.Items[ReferenceKey] as string;
+            if (reference == null)
+            {
+                reference = Guid.NewGuid().ToString("N");
+                if (context != null) context.Items[ReferenceKey] = reference;
+            }
+            return reference;
+        }
+        internal static void Event(HttpContext context, string eventName, long elapsedMilliseconds = 0, object[] issuerCalls = null)
+        {
+            try
+            {
+                ILog logger = LogManager.GetLogger(typeof(EmergencyDiagnostics));
+                lock (Gate) { if (!logger.Logger.Repository.Configured) XmlConfigurator.Configure(logger.Logger.Repository); }
+                logger.Info(new JObject
+                {
+                    ["event"] = eventName, ["reference_id"] = Reference(context),
+                    ["timestamp_utc"] = DateTimeOffset.UtcNow.ToString("o"),
+                    ["endpoint"] = Endpoint(context), ["operation"] = Operation(context),
+                    ["status"] = context == null ? 0 : context.Response.StatusCode,
+                    ["elapsed_ms"] = elapsedMilliseconds,
+                    ["issuer_calls"] = JArray.FromObject(issuerCalls ?? new object[0])
+                }.ToString(Formatting.None));
+            }
+            catch (Exception) { /* Logging must not interrupt the request. */ }
         }
 
         private static string Endpoint(HttpContext context)

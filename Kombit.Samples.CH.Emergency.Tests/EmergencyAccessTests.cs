@@ -11,6 +11,12 @@ namespace Kombit.Samples.CH.Emergency.Tests
     [TestClass]
     public class EmergencyAccessTests
     {
+        [TestMethod]
+        public void BackendKey_UsesConfiguredPocTextWithoutEnvironment()
+        {
+            Assert.AreEqual("poc-key", new Kombit.Samples.CH.Emergency.EmergencySettings { ApiKey = "poc-key" }.BackendKey());
+        }
+
         [DataTestMethod]
         [DataRow(false)]
         [DataRow(true)]
@@ -34,10 +40,10 @@ namespace Kombit.Samples.CH.Emergency.Tests
                 Assert.AreEqual("Synthetic User", principal.Identity.Name);
                 Assert.IsNotNull(principal);
                 Assert.IsTrue(principal.IsInRole("case-admin"));
-                Assert.IsFalse(principal.Claims.Any(claim => claim.Value == "normal-evidence"));
+                Assert.IsTrue(principal.Claims.Any(claim => claim.Value == "normal-evidence"));
                 Assert.AreEqual(calls, fixture.Calls);
-                Assert.IsNull(principal.FindFirst("acr"));
-                Assert.IsNull(principal.FindFirst("access_token"));
+                Assert.IsNotNull(principal.FindFirst("acr"));
+                Assert.IsNotNull(principal.FindFirst("access_token"));
                 CollectionAssert.AreEquivalent(
                     new[] { "case-admin", "read-only", "administrator" },
                     principal.FindAll("role").Select(claim => claim.Value).ToArray()
@@ -95,9 +101,7 @@ namespace Kombit.Samples.CH.Emergency.Tests
 
         [DataTestMethod]
         [DataRow("up")]
-        [DataRow("uv")]
-        [DataRow("backup")]
-        [DataRow("backedUp")]
+        [DataRow("invalid-backup-state")]
         [DataRow("type")]
         [DataRow("challenge")]
         [DataRow("origin")]
@@ -232,8 +236,21 @@ namespace Kombit.Samples.CH.Emergency.Tests
             }
         }
 
+        [DataTestMethod]
+        [DataRow("uv")][DataRow("backup")][DataRow("backedUp")]
+        public async Task PocUp_AcceptsPresenceAndValidBackupStates(string mutation)
+        {
+            using (var fixture = new SamlFixture())
+            {
+                string login = fixture.Login(); var entry = await fixture.Pending(login);
+                var challenge = fixture.Access.StartProof(fixture.Browser, (string)entry["emergency_credential"], false, login);
+                Assert.AreEqual("preferred", (string)challenge["publicKey"]["userVerification"]);
+                await fixture.Access.CompleteProof(fixture.Browser, (string)challenge["transaction_id"], false, fixture.Assertion((JObject)challenge["publicKey"], 1, mutation), login);
+                Assert.AreEqual("active", (string)fixture.Access.Readiness(login, fixture.Browser)["credentials"][0]["status"]);
+            }
+        }
         [TestMethod]
-        public async Task Remove_Offline_PersistsBlockAndRemovalQueue()
+        public async Task Remove_Offline_PersistsDeletionAndRemovalQueue()
         {
             // Arrange
             using (SamlFixture fixture = new SamlFixture())
@@ -250,6 +267,8 @@ namespace Kombit.Samples.CH.Emergency.Tests
                     CancellationToken.None
                 );
                 // Assert
+                Assert.AreEqual(0, ((JArray)fixture.Access.Readiness(normal, fixture.Browser)["credentials"]).Count);
+                Assert.ThrowsExactly<Kombit.Samples.CH.Emergency.EmergencyFailure>(() => fixture.Access.StartProof(fixture.Browser, (string)entry["emergency_credential"], true, null));
                 Assert.IsNull(
                     fixture.Access.Authenticate((string)ticket["session"], fixture.Browser)
                 );
@@ -257,6 +276,7 @@ namespace Kombit.Samples.CH.Emergency.Tests
                 Assert.IsNull(
                     fixture.Access.Authenticate((string)ticket["session"], fixture.Browser)
                 );
+                Assert.AreEqual(0, ((JArray)fixture.Access.Readiness(fixture.Login(), fixture.Browser)["credentials"]).Count);
                 fixture.Offline = false;
                 int calls = fixture.Calls;
                 await fixture.Access.SynchronizeIfDue(CancellationToken.None);

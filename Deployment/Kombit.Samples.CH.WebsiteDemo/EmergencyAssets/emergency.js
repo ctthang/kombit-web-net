@@ -117,7 +117,19 @@
         });
     renderIssuerCalls();
 
+
+    function setPreparationState(canPrepare) {
+        const login = document.getElementById('normal-login-step');
+        const prepare = document.getElementById('prepare-step');
+        const button = document.getElementById('register');
+        if (!login || !prepare || !button) return;
+        login.hidden = canPrepare;
+        prepare.hidden = !canPrepare;
+        button.disabled = !canPrepare;
+    }
+
     async function send(operation, values) {
+        if (operation === "enroll" || operation === "renew") setPreparationState(false);
         const response = await fetch(page.dataset.api + '?op=' + encodeURIComponent(operation), {
             method: 'POST',
             credentials: 'same-origin',
@@ -179,6 +191,30 @@
             .replace(/\+/g, '-')
             .replace(/\//g, '_');
     }
+
+    async function deleteStoredBinding(bindingId) {
+        const db = await new Promise((resolve, reject) => {
+            const request = indexedDB.open('saml-emergency-credentials-v1', 1);
+            request.onupgradeneeded = () => request.result.createObjectStore('entries', { keyPath: 'ec_id' });
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(new Error('Browser storage is unavailable.'));
+        });
+        try {
+            await new Promise((resolve, reject) => {
+                const transaction = db.transaction('entries', 'readwrite');
+                const cursor = transaction.objectStore('entries').openCursor();
+                cursor.onsuccess = () => {
+                    const item = cursor.result;
+                    if (!item) return;
+                    if (item.value.binding_id === bindingId) item.delete();
+                    item.continue();
+                };
+                transaction.oncomplete = resolve;
+                transaction.onerror = transaction.onabort = () => reject(new Error('Key removed from the server, but browser cleanup failed. Retry browser cleanup before using emergency login.'));
+            });
+        } finally { db.close(); }
+    }
+
     async function storage(record) {
         const database = await new Promise((resolve, reject) => {
             const request = indexedDB.open('saml-emergency-credentials-v1', 1);
@@ -301,6 +337,7 @@
         if (!list) return;
         const saved = await storage();
         const state = page.dataset.mode === 'prepare' ? await send('status') : null;
+        if (state) setPreparationState(state.can_prepare === true);
         list.replaceChildren();
         for (const entry of saved) {
             const current = state && state.credentials.find(item => item.ec_id === entry.ec_id);
@@ -352,8 +389,9 @@
                         async () => {
                             if (!confirm('Remove key …' + entry.binding_id.slice(-6) + '?')) return;
                             await send('remove', { binding_id: entry.binding_id });
+                            await deleteStoredBinding(entry.binding_id);
                             show(
-                                'Key blocked locally. Failed issuer reports remain queued.',
+                                'Key removed from this browser and the local registry. Failed issuer reports remain queued.',
                                 'success',
                             );
                             await displayKeys();
@@ -365,6 +403,7 @@
                 id.append(element('code', null, entry.binding_id));
                 row.append(id);
             }
+            if (page.dataset.mode === 'login') actions.append(control('Forget browser copy', async () => { if (!confirm('Forget all copies of this key in this browser? This does not revoke its server registration.')) return; await deleteStoredBinding(entry.binding_id); show('Browser copies removed. Server registration was not changed.', 'success'); await displayKeys(); }));
             if (actions.children.length) row.append(actions);
             list.append(row);
         }

@@ -34,10 +34,14 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                     : "ended";
                 if (Mode == "prepare")
                 {
-                    CanPrepare = EmergencyWeb.Service.CanPrepare(
-                        EmergencyWeb.NormalHandle(Context),
-                        EmergencyWeb.Browser(Context, false)
-                    );
+                    try
+                    {
+                        CanPrepare = EmergencyWeb.Service.CanPrepare(EmergencyWeb.NormalHandle(Context), EmergencyWeb.Browser(Context, false));
+                    }
+                    catch (EmergencyFailure failure) when (failure.StatusCode == 401 || failure.ErrorCode == "new_normal_login_required")
+                    {
+                        CanPrepare = false;
+                    }
                 }
                 if (Mode == "home" && !EmergencyWeb.IsEmergency(Context))
                 {

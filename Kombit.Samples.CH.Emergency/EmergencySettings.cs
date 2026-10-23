@@ -16,6 +16,13 @@ namespace Kombit.Samples.CH.Emergency
         public string PrivateEncryptionKeyFile { get; set; }
         public string EncryptionKeyId { get; set; }
         public string InitialSigningKeysFile { get; set; }
+        public string ApiKey { get; set; }
+        public string BackendKey()
+        {
+            if (ApiKey == null) return Secret(BackendSecretVariable);
+            if (string.IsNullOrWhiteSpace(ApiKey) || ApiKey.Length > 512 || ApiKey.Any(char.IsControl)) throw new InvalidOperationException("Invalid configured API key.");
+            return ApiKey;
+        }
         public string BackendSecretVariable { get; set; } = "SAML_EMERGENCY_ISSUER_KEY";
         public int SessionMinutes { get; set; } = 480;
 
@@ -51,7 +58,7 @@ namespace Kombit.Samples.CH.Emergency
             {
                 CheckExternalPath(path, applicationDirectory);
             }
-            Secret(BackendSecretVariable);
+            BackendKey();
         }
 
         private static bool Https(string value)

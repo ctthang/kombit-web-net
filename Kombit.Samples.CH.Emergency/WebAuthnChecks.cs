@@ -36,7 +36,7 @@ namespace Kombit.Samples.CH.Emergency
                 configuration,
                 Wire.Decode(Wire.RandomId()),
                 new[] { new PublicKeyCredentialDescriptor(Wire.Decode(credential)) },
-                UserVerificationRequirement.Required,
+                UserVerificationRequirement.Preferred,
                 new AuthenticationExtensionsClientInputs()
             );
         }
@@ -73,7 +73,7 @@ namespace Kombit.Samples.CH.Emergency
                 );
                 stage = "authenticator-data";
                 byte[] data = Wire.Decode(Wire.String(response, "authenticatorData", 16384));
-                if (data.Length < 37 || (data[32] & 5) != 5 || (data[32] & 24) != 0)
+                if (data.Length < 37 || (data[32] & 1) == 0 || ((data[32] & 16) != 0 && (data[32] & 8) == 0))
                 {
                     throw Wire.Invalid();
                 }

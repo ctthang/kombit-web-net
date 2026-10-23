@@ -33,6 +33,19 @@ namespace Kombit.Samples.CH.Emergency.Tests
             LogManager.GetRepository(typeof(EmergencyDiagnostics).Assembly).ResetConfiguration();
         }
 
+        [TestMethod]
+        public void LifecycleEvents_ShareFailureReferenceAndOmitQueryValues()
+        {
+            var context = Context();
+            EmergencyDiagnostics.Event(context, "request_started");
+            string reference = EmergencyDiagnostics.Log(context, 403, "normal_login_required");
+            EmergencyDiagnostics.Event(context, "request_completed", 25);
+            var events = appender.GetEvents();
+            Assert.AreEqual(3, events.Length);
+            Assert.IsTrue(events.All(e => (string)JObject.Parse(e.RenderedMessage)["reference_id"] == reference));
+            Assert.AreEqual(25L, (long)JObject.Parse(events[2].RenderedMessage)["elapsed_ms"]);
+            Assert.IsFalse(events.Any(e => e.RenderedMessage.Contains("private")));
+        }
         private static HttpContext Context(string query = "op=enroll&secret=private-query")
         {
             return new HttpContext(

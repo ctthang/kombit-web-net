@@ -60,10 +60,11 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                                 assertion.Assertion.IssueInstant.Value,
                                 DateTimeKind.Utc
                             )
-                        ).ToUnixTimeSeconds() + 600,
+                        ).ToUnixTimeSeconds() + 86400,
                 };
                 SessionStore.CurrentSession[EmergencyWeb.LoginHandle] =
                     EmergencyWeb.Service.RecordLogin(login);
+                EmergencyDiagnostics.Event(context, "normal_login_captured");
             }
             catch (Exception exception)
             {

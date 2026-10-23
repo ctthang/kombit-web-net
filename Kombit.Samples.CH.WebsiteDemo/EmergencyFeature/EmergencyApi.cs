@@ -15,6 +15,9 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
     {
         public override async Task ProcessRequestAsync(HttpContext context)
         {
+            var requestTimer = System.Diagnostics.Stopwatch.StartNew();
+            context.Response.Headers["X-Emergency-Reference"] = EmergencyDiagnostics.Reference(context);
+            EmergencyDiagnostics.Event(context, "request_started");
             using (var issuerTrace = new IssuerCallTrace())
             {
                 EmergencyWeb.Headers(context);
@@ -198,6 +201,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 }
                 finally
                 {
+                    EmergencyDiagnostics.Event(context, "request_completed", requestTimer.ElapsedMilliseconds, issuerTrace.Snapshot());
                     context.Response.Headers["X-Emergency-Issuer-Calls"] = Convert.ToBase64String(
                         Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(issuerTrace.Snapshot()))
                     );

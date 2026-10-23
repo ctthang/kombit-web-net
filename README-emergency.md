@@ -1,4 +1,12 @@
 # SAML emergency access PoC
+## Current PoC configuration (October 23, 2026)
+
+Configure a matching `ApiKey` string directly in each Identify `Clients[]` entry and in that client's settings. For example, use `"ApiKey": "oidc-poc-key"` on both OIDC sides and a different `"ApiKey": "saml-poc-key"` on both SAML sides. Plain nonempty text or a GUID is supported, up to 512 characters without control characters. No issuer-key environment variables are required. Existing environment-variable settings are supported only as a legacy fallback when ApiKey is absent. Do not print live keys in diagnostics.
+
+The issuer defaults and upper bounds are RecordLifetime=`1.00:00:00` (24 hours), EnrollmentLifetime=`01:00:00` (1 hour), and CredentialLifetime=`30.00:00:00` (30 days). The enrollment deadline is capped by its source record's expiry. Client preparation is also bounded by normal-login validity. Both clients accept the corresponding 30-day credentials; revocations are retained for 30 days plus five minutes. WebAuthn proof challenges remain short-lived. Deploy issuer and client updates together before issuing longer credentials.
+
+OIDC uses the normal ID token; SAML uses the normal assertion. Normal protocol, assurance, identity, application, and repeated claims are retained in the credential snapshot and emergency principal. Their original exp/iat/iss/acr values describe the original login; the emergency session has its own independently enforced expiry and authentication type. Source claims cannot replace internal `emergency*` or `local_*` session controls. General size, signature, issuer, audience, and input validation remain enforced. Renew after a fresh normal login to obtain a new snapshot. Attributes absent from the ID token/assertion cannot be invented by the client.
+
 
 The sample keeps Web Forms, .NET Framework 4.8, and OIOSAML.NET. Emergency support is disabled by default. `Kombit.Samples.CH.Emergency` belongs to this repository and uses public Fido2 2.0.2. It shares no code, DTO project, or browser bundle with the OIDC example. Identify keeps Safewhere.Fido2.
 
@@ -17,7 +25,7 @@ For the local dev520/kombitspnew deployment, use the [step-by-step setup guide a
    The directory must be new, local, and outside all repositories and web roots. The tool restricts ACLs and creates a DPAPI-protected private key plus a public JWK. It does not enable support or create TLS credentials.
 4. Register the public JWK's `kid`, `n`, and `e` in Identify. Match the normal SAML entity ID, issuer, and Identify connection GUID, and enable issuance for that client.
 5. Copy [emergency-settings.example.json](emergency-settings.example.json) outside the repository. Replace all placeholders. `IssuerRuntimeUrl` ends in `/`. Obtain emergency signing keys over verified HTTPS, establish trust during setup, and save them at `InitialSigningKeysFile`. Offline login never fetches keys. Remove `OperatorSecretVariable`, `PreserveNormalClaims`, `ClaimTypes`, `Roles`, `Privileges`, and `PrivilegeScopes` from settings files created for earlier versions; unknown properties are rejected.
-6. Supply a random backend secret of at least 32 characters through the named environment variable for the IIS worker. The key must match Identify's emergency client. Keep all values outside source, URLs, and logs.
+6. Set `ApiKey` in the external SAML JSON to the same string as the issuer SAML client entry. No backend-key environment variable is required.
 7. Provision a stable ASP.NET `machineKey` for this application through IIS server-level configuration or an encrypted configuration section in an external deployment. Preserve it across restarts. Enabled emergency support rejects `AutoGenerate` keys. Do not commit key values.
 8. Set these deployment application settings and restart:
 
@@ -34,11 +42,11 @@ State uses `MachineKey.Protect` with an application-specific purpose. Private RS
 
 ## Use the feature
 
-Open `Emergency.aspx` after normal login. Complete registration, IndexedDB storage/read-back, and the second key check. Only then is the browser ready, and emergency login is immediately available for it. Use a key with user verification and no passkey backup. Missing or old assertion evidence requires a new normal login; the preparation window is ten minutes.
+Open `Emergency.aspx` after normal login. Complete registration, IndexedDB storage/read-back, and the second key check. Only then is the browser ready, and emergency login is immediately available for it. Use a security key or passkey with user presence; user verification is preferred and backup is allowed. Missing or old assertion evidence requires a new normal login; the preparation window is at most 24 hours.
 
 `EmergencyLogin.aspx`, `EmergencyHome.aspx`, and local logout need no Identify request. A separate protected cookie and principal represent the emergency session. No SAML assertion or `Saml20Identity` is fabricated. `MyPage.aspx` redirects an emergency user locally before its SAML expressions run. Normal STS/service-action posts and SAML login/logout handlers reject emergency callers.
 
-Renewal requires a newer normal login. The replacement stays pending until storage and possession succeed. Removing a key blocks it locally first; failed issuer reports remain queued. When the preparation page loads its key status, the sample synchronizes with Identify at most once every ten minutes: it refreshes trust, applies central revocations, and retries queued removals. Synchronization failures are ignored. There is no issuer request from emergency login.
+Renewal requires a newer normal login. The replacement stays pending until storage and possession succeed. Removing a key deletes its local registration, all associated credential versions, and sessions; failed issuer revocation reports remain queued. When the preparation page loads its key status, the sample synchronizes with Identify at most once every ten minutes: it refreshes trust, applies central revocations, and retries queued removals. Synchronization failures are ignored. There is no issuer request from emergency login.
 
 Claims from the normal login are always preserved, including roles and `privilegesIntermediate` privilege XML, which pass through unchanged. An emergency session therefore carries the same roles and privileges as the normal login it was prepared from. Normal assurance, tokens, bootstrap tokens, and reserved emergency markers cannot enter the emergency principal.
 
@@ -89,6 +97,26 @@ Results contain no request/response bodies, API keys, token references, emergenc
 
 The sample always preserves the claims from the normal login; there is no setting for it in the sample's emergency settings. The matching Identify issuer client must still have `PreserveNormalClaims: true` so that the credential carries the full snapshot. For this SAML sample, Identify captures the claims it issued in the normal SAML assertion and signs them into the emergency credential. The browser never supplies a replacement claims list. The sample projects the verified credential's snapshot into its emergency principal, preserving claim types, values, value types, and repeated claims. It does not fetch current claims during offline login.
 
-Token metadata, raw tokens, and emergency-reserved claims remain excluded. Clients continue to exclude normal assurance claims such as `acr`, `amr`, `auth_time`, and LoA claims. Roles, SAML privileges, and scopes are not restricted. `emergency=true`, `local_assurance=emergency-possession`, and local session expiry remain authoritative. A `name` or standard name claim replaces the generic Prepared user display. Original claim names are preserved rather than automatically applying OIDC inbound claim-name mapping.
+Normal-login claim types and values, including protocol metadata and assurance claims, are preserved as historical snapshot data. Local `emergency*` and `local_*` control claims remain reserved so a source token cannot override the active session identifier or expiry. The emergency session authenticates and expires independently of the original token. Roles and SAML BPP claims are not allowlisted or rewritten.
 
 Deploy the updated issuer and sample, remove `PreserveNormalClaims`, `ClaimTypes`, `Roles`, `Privileges`, and `PrivilegeScopes` from the sample's external settings, and restart their application pools. Then obtain a fresh normal login and renew or prepare the emergency credential. Existing credentials contain the old snapshot and cannot acquire claims retroactively. Missing attributes that were never present in the assertion cannot be invented by this option.
+
+## Remove a local key
+
+**Remove key locally** deletes the binding and all associated credential versions from the client registry and this browser's IndexedDB, including renewed/replaced copies. It ends existing sessions for that binding and rejects replay of its previously issued credentials. The row disappears rather than becoming Blocked. An offline removal is immediately effective and survives restart; only the binding identifier needed to retry issuer revocation is retained in the internal queue. Other browsers may retain stale copies, but the server rejects them. This removes the application registration; it does not erase a hardware authenticator's internal key through WebAuthn.
+
+If removal succeeds on the server but browser cleanup fails or the response is lost, open the emergency-login page and use **Forget browser copy** for that key. This clears all its versions from this browser without contacting the server; it does not revoke an otherwise valid server registration.
+
+The preparation page shows exactly one next action: **Prepare this browser** while a fresh unused normal-login record is eligible, or **Get a new normal login for preparation or renewal** otherwise. Starting preparation/renewal consumes that record, so the page switches back to the login action. Pending credentials can still be confirmed using their own key-check control.
+
+## Trace a request from start to finish
+
+Emergency API responses include `X-Emergency-Reference`. The same ID appears in the existing error JSON's `reference_id` and the server's structured events. Search the log for that value to join `request_started`, any `emergency_failure`, and `request_completed`. Completion records include UTC time, normalized endpoint/recognized operation, HTTP status, elapsed milliseconds, and sanitized issuer-call summaries. Successful normal SAML capture emits `normal_login_captured` on the accepted-login callback's own reference.
+
+These events use the existing log4net logger `Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyDiagnostics`. Enable Information or lower for that logger to see successful lifecycle events; Warning/Error still carry failures. The sample Web.config uses the `LogFileAppender` rolling-file appender with a 10 MB file limit and ten backups. Check its configured File path in the deployed configuration; for shared deployments, use a restricted writable directory outside the web root.
+
+No request bodies, query values, cookies, tokens, credentials, API keys, or claim values are added to these lifecycle events. Existing sanitized failure records retain exception types/HResults and bounded stack method/line details. Logging failures do not interrupt the operation. A successful local removal can still have a failed upstream revocation summary because its retry is queued internally.
+
+## Authenticator policy compatibility
+
+The current issuer and both clients use `poc-up`: presence is required, verification is preferred, and valid backup-eligible/backed-up passkeys are accepted. A backup-state bit without backup eligibility is rejected. Signature, origin/RP, one-use challenge, credential ownership, and counter checks remain enforced. Credentials labeled with the older `poc-uv-nonbackup` policy must be renewed to the current policy; they are not silently reinterpreted.

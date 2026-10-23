@@ -42,7 +42,7 @@ namespace Kombit.Samples.CH.Emergency
                 {
                     request.Headers.Add(
                         "X-Emergency-Client-Key",
-                        EmergencySettings.Secret(settings.BackendSecretVariable)
+                        settings.BackendKey()
                     );
                     if (body != null)
                     {

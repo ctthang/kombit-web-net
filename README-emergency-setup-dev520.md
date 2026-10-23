@@ -1,5 +1,8 @@
 # SAML emergency setup: dev520 and kombitspnew
 
+> Historical setup/test record. For current configuration-file API keys, complete normal claim snapshots, and 24-hour / 1-hour / 30-day lifetimes, follow the current emergency setup guide. Environment-variable and shorter-lifetime instructions below describe the earlier deployment.
+
+
 This guide records the local setup for `https://kombitspnew.safewhere.local/`. Commands that change IIS or machine environment variables require an elevated PowerShell 7 session. Do not paste real keys, secrets, assertions, or state files into the repository.
 
 ## Values for this deployment
@@ -207,3 +210,11 @@ For future verification failures, the client writes a bounded `state\proof-diagn
 ## Operator role removed
  local operator page, emergency acceptance switch, local account/key blocking, and operator secret were removed from the SAML client. The operator steps recorded above are historical. A browser can log in with its emergency credential as soon as preparation reports **Ready**. Synchronization with Identify now runs automatically, at most every ten minutes, when the preparation page loads key status.
  deploying this version to kombitspnew, delete the `OperatorSecretVariable`, `PreserveNormalClaims`, `ClaimTypes`, `Roles`, `Privileges`, and `PrivilegeScopes` properties from `settings.json`; the loader rejects unknown properties. Normal-login claims, including roles and privileges, are now always preserved unchanged. Keep `PreserveNormalClaims` enabled on the Identify issuer client. The `SAML_EMERGENCY_OPERATOR_KEY` machine and pool environment entries are no longer read and can be removed.
+
+## October 23, 2026: current PoC deployment test
+
+After the user deployed the current SAML client, normal login worked but emergency preparation returned 503 (`emergency_unavailable`, reference `1118b3d57ded498396a2a3daca0a7fe4`). The external settings still contained retired operator/claim-filter fields rejected by the strict settings loader. Migrated that file to the current schema, copied the existing matching SAML issuer key into `ApiKey`, and removed the obsolete properties. Keys, machine key, and state were preserved. Backup: `settings.json.before-poc-20261023-162650.bak` beside the live settings file. Restarted only the SAML pool; EmergencyLogin.aspx returned HTTP 200.
+
+A fresh dev520 SAML login completed and the existing credential was available for renewal. Renewal was started to obtain the current `poc-up` policy and 30-day lifetime; possession verification and final emergency login are pending until recorded below.
+
+The October 23 live SAML test completed successfully: renewal produced an active credential expiring November 22, 2026, and emergency login with it succeeded. The emergency home page displayed the normal assertion snapshot, including name, all seven KOMBIT profile claim types, repeated role values, the original BPP value, and internal user ID, plus the local emergency-session controls. Normal LoA is present as historical assertion data under the requested PoC claim-preservation behavior. No raw assertion, token, secret, or personal claim value is recorded here. The browser was left on the successful emergency home page for inspection.
