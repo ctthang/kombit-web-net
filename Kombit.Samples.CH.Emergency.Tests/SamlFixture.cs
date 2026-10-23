@@ -23,7 +23,6 @@ namespace Kombit.Samples.CH.Emergency.Tests
         public string Binding { get; private set; } = Wire.RandomId();
         public string CredentialId { get; private set; } = Wire.RandomId();
         public string UserHandle { get; private set; } = Wire.RandomId();
-        public string OperatorSecret { get; private set; } = Wire.RandomId();
         public DateTimeOffset Time { get; set; } =
             DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         public EmergencySettings Settings { get; private set; }
@@ -65,12 +64,8 @@ namespace Kombit.Samples.CH.Emergency.Tests
                 EncryptionKeyId = "test-encryption",
                 InitialSigningKeysFile = Path.Combine(DirectoryPath, "trust.json"),
                 BackendSecretVariable = "TEST_SAML_BACKEND_" + unique,
-                OperatorSecretVariable = "TEST_SAML_OPERATOR_" + unique,
-                ClaimTypes = new[] { "email", "role", "acr", "access_token", "emergency_session" },
-                Roles = new[] { "read-only" },
             };
             Environment.SetEnvironmentVariable(Settings.BackendSecretVariable, Wire.RandomId());
-            Environment.SetEnvironmentVariable(Settings.OperatorSecretVariable, OperatorSecret);
             using (SHA256 hash = SHA256.Create())
             {
                 File.WriteAllBytes(
@@ -335,6 +330,10 @@ namespace Kombit.Samples.CH.Emergency.Tests
                     Claim("email", "user@example.invalid"),
                     Claim("role", "read-only"),
                     Claim("role", "administrator"),
+                    Claim(
+                        "https://data.gov.dk/model/core/eid/privilegesIntermediate",
+                        "PFByaXZpbGVnZUxpc3QvPg=="
+                    ),
                     Claim("acr", "normal-high"),
                     Claim("access_token", "not-a-real-token"),
                     Claim("emergency_session", "untrusted")
@@ -555,7 +554,6 @@ namespace Kombit.Samples.CH.Emergency.Tests
                 elliptic.Dispose();
                 signer.Dispose();
                 Environment.SetEnvironmentVariable(Settings.BackendSecretVariable, null);
-                Environment.SetEnvironmentVariable(Settings.OperatorSecretVariable, null);
                 string prefix =
                     Path.GetFullPath(Path.Combine(Path.GetTempPath(), "SamlEmergencyTests"))
                     + Path.DirectorySeparatorChar;

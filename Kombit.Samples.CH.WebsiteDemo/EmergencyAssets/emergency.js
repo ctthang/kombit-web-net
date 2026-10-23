@@ -9,7 +9,6 @@
         status.textContent = text;
     };
     const messages = {
-        acceptance_off: 'Emergency acceptance is off. A local operator must enable it first.',
         csrf_or_origin_rejected: 'The request was rejected. Reload the page and try again.',
         https_origin_required: 'Emergency access requires the configured HTTPS address.',
         key_proof_rejected: 'The key check was rejected.',
@@ -58,7 +57,7 @@
         if (!callHistory.length) {
             const item = document.createElement('li');
             item.textContent =
-                'No calls recorded in this tab yet. Perform preparation, renewal, removal, or operator synchronization to see Identify results.';
+                'No calls recorded in this tab yet. Open the preparation page, or prepare, renew, or remove a key to see Identify results.';
             list.append(item);
         }
     }
@@ -149,9 +148,9 @@
             }
         };
     }
-    function connect(id, operation, type) {
+    function connect(id, operation) {
         const element = document.getElementById(id);
-        if (element) element.addEventListener(type || 'click', action(operation));
+        if (element) element.addEventListener('click', action(operation));
     }
     function bytes(value) {
         const base64 =
@@ -216,7 +215,7 @@
         if (login) {
             location.assign(result.redirect);
         } else {
-            show('Ready. This browser and key can log in while local acceptance is on.', 'success');
+            show('Ready. This browser and key can now be used for emergency login.', 'success');
             await displayKeys();
         }
     }
@@ -362,92 +361,9 @@
                 ),
             );
     }
-    function stat(label, value) {
-        const item = element('div');
-        const term = element('dt', null, label);
-        const detail = element('dd');
-        detail.append(value);
-        item.append(term, detail);
-        return item;
-    }
-    async function operatorState() {
-        const state = await send('operator-status');
-        document.getElementById('operator-panel').hidden = false;
-        document
-            .getElementById('operator-status')
-            .replaceChildren(
-                stat(
-                    'Emergency acceptance',
-                    element(
-                        'span',
-                        'badge ' + (state.accepting ? 'on' : 'off'),
-                        state.accepting ? 'On' : 'Off',
-                    ),
-                ),
-                stat(
-                    'Last successful sync',
-                    state.last_poll ? new Date(state.last_poll * 1000).toLocaleString() : 'Never',
-                ),
-                stat('Queued removals', String(state.queued_removals)),
-            );
-        const list = document.getElementById('events');
-        list.replaceChildren();
-        state.audit
-            .slice()
-            .reverse()
-            .forEach(value => list.append(element('li', null, value)));
-        if (!list.children.length) list.append(element('li', null, 'No events recorded yet.'));
-    }
-    connect(
-        'operator-form',
-        async () => {
-            const field = document.getElementById('operator-key');
-            const secret = field.value;
-            field.value = '';
-            await send('operator-login', { secret });
-            location.reload();
-        },
-        'submit',
-    );
-    connect('enable', async () => {
-        await send('acceptance', {
-            enabled: true,
-            minutes: Number(document.getElementById('duration').value),
-        });
-        await operatorState();
-        show('Acceptance enabled.', 'success');
-    });
-    connect('disable', async () => {
-        await send('acceptance', { enabled: false, minutes: 0 });
-        await operatorState();
-        show('Acceptance stopped. Existing emergency sessions are invalid.', 'success');
-    });
-    connect('block', async () => {
-        await send('block', {
-            binding_id: document.getElementById('binding-id').value,
-            whole_account: document.getElementById('block-account').checked,
-        });
-        await operatorState();
-        show('Local block applied.', 'success');
-    });
-    connect('sync', async () => {
-        await send('poll');
-        await operatorState();
-        show('Online synchronization completed.', 'success');
-    });
-    connect('operator-exit', async () => {
-        await send('operator-logout');
-        location.reload();
-    });
     connect('exit', async () => {
         const result = await send('logout');
         location.assign(result.redirect);
     });
-    if (
-        page.dataset.mode === 'prepare' ||
-        (page.dataset.mode === 'login' && page.dataset.accepting === 'true')
-    )
-        action(displayKeys)();
-    if (page.dataset.mode === 'operator' && !document.getElementById('operator-panel').hidden)
-        action(operatorState)();
+    if (page.dataset.mode === 'prepare' || page.dataset.mode === 'login') action(displayKeys)();
 })();

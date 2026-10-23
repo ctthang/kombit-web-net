@@ -53,11 +53,6 @@ namespace Kombit.Samples.CH.Emergency.Tests
                 string normal = fixture.Login();
                 JObject issued = await fixture.Pending(normal);
                 await fixture.Prove(issued, false, normal, 0);
-                fixture.Access.SetAcceptance(
-                    fixture.Access.SignInOperator(fixture.OperatorSecret),
-                    true,
-                    10
-                );
                 // Act and Assert
                 Assert.IsNotNull(await fixture.Prove(issued, true, null, 0));
             }
@@ -70,11 +65,6 @@ namespace Kombit.Samples.CH.Emergency.Tests
             using (SamlFixture fixture = new SamlFixture())
             {
                 JObject issued = await fixture.Active();
-                fixture.Access.SetAcceptance(
-                    fixture.Access.SignInOperator(fixture.OperatorSecret),
-                    true,
-                    10
-                );
                 // Act and Assert
                 await Assert.ThrowsExactlyAsync<EmergencyFailure>(() =>
                     fixture.Prove(issued, true, null, 1)

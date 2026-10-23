@@ -15,7 +15,6 @@ namespace Kombit.Samples.CH.Emergency
         public string Cose { get; set; }
         public uint Counter { get; set; }
         public long Revision { get; set; }
-        public long Epoch { get; set; }
         public long Deadline { get; set; }
         public AssertionOptions Options { get; set; }
     }

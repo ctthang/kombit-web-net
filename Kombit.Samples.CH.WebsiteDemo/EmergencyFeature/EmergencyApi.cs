@@ -96,7 +96,9 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                             break;
                         case "status":
                             Wire.Fields(body);
-                            result = access.Readiness(EmergencyWeb.NormalHandle(context), browser);
+                            string handle = EmergencyWeb.NormalHandle(context);
+                            await access.SynchronizeIfDue(cancellation);
+                            result = access.Readiness(handle, browser);
                             break;
                         case "activate-options":
                             Wire.Fields(body, "emergency_credential");
@@ -162,50 +164,6 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                                     "~/EmergencyEnded.aspx"
                                 ),
                             };
-                            break;
-                        case "operator-login":
-                            Wire.Fields(body, "secret");
-                            EmergencyWeb.OperatorCookieSet(
-                                context,
-                                access.SignInOperator(Wire.String(body, "secret", 512))
-                            );
-                            result = new JObject { ["authenticated"] = true };
-                            break;
-                        case "operator-logout":
-                            Wire.Fields(body);
-                            access.SignOutOperator(EmergencyWeb.OperatorId(context));
-                            EmergencyWeb.OperatorCookieClear(context);
-                            result = new JObject();
-                            break;
-                        case "operator-status":
-                            Wire.Fields(body);
-                            result = access.OperatorStatus(EmergencyWeb.OperatorId(context));
-                            break;
-                        case "acceptance":
-                            Wire.Fields(body, "enabled", "minutes");
-                            access.SetAcceptance(
-                                EmergencyWeb.OperatorId(context),
-                                (bool)body["enabled"],
-                                checked((int)Wire.Number(body, "minutes"))
-                            );
-                            result = new JObject();
-                            break;
-                        case "block":
-                            Wire.Fields(body, "binding_id", "whole_account");
-                            access.LocalBlock(
-                                EmergencyWeb.OperatorId(context),
-                                Wire.String(body, "binding_id", 128),
-                                (bool)body["whole_account"]
-                            );
-                            result = new JObject();
-                            break;
-                        case "poll":
-                            Wire.Fields(body);
-                            await access.Synchronize(
-                                EmergencyWeb.OperatorId(context),
-                                cancellation
-                            );
-                            result = new JObject();
                             break;
                         default:
                             throw new EmergencyFailure(404, "not_found");

@@ -88,15 +88,10 @@ namespace Kombit.Samples.CH.Emergency
                         ["version"] = 1,
                         ["identity"] = identity,
                         ["trust"] = trust,
-                        ["acceptance"] = false,
-                        ["epoch"] = 0L,
-                        ["until"] = 0L,
                         ["cursor"] = 0L,
-                        ["last_sync"] = 0L,
                         ["keys"] = new JObject(),
                         ["credentials"] = new JObject(),
                         ["sessions"] = new JObject(),
-                        ["blocked_accounts"] = new JArray(),
                         ["pending_removals"] = new JArray(),
                         ["events"] = new JArray(),
                     };
@@ -105,8 +100,6 @@ namespace Kombit.Samples.CH.Emergency
                 string disabled = Path.Combine(settings.StateDirectory, "support-disabled");
                 if (File.Exists(disabled))
                 {
-                    current["acceptance"] = false;
-                    current["epoch"] = (long)current["epoch"] + 1;
                     current["sessions"] = new JObject();
                     Write(current);
                     File.Delete(disabled);

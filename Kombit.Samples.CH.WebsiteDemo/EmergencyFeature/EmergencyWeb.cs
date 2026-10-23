@@ -19,7 +19,6 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
     {
         private const string BrowserCookie = "__Secure-SamlEmergencyBrowser";
         private const string SessionCookie = "__Secure-SamlEmergencySession";
-        private const string OperatorCookie = "__Secure-SamlEmergencyOperator";
         public const string LoginHandle = "SamlEmergencyAcceptedLogin";
         private static readonly object Gate = new object();
         private static readonly HttpClient Backend = new HttpClient(
@@ -61,21 +60,6 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 return service;
             }
         }
-        public static bool Accepting
-        {
-            get
-            {
-                try
-                {
-                    return Enabled && Service.Accepting;
-                }
-                catch (Exception)
-                {
-                    return false;
-                }
-            }
-        }
-
         public static bool IsEmergency(HttpContext context)
         {
             return context.User != null
@@ -448,23 +432,6 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
             {
                 ClearCookie(context, SessionCookie);
             }
-        }
-
-        public static string OperatorId(HttpContext context)
-        {
-            string id = ReadProtected(context, OperatorCookie, "operator");
-            Service.CheckOperator(id);
-            return id;
-        }
-
-        public static void OperatorCookieSet(HttpContext context, string id)
-        {
-            WriteProtected(context, OperatorCookie, id, "operator");
-        }
-
-        public static void OperatorCookieClear(HttpContext context)
-        {
-            ClearCookie(context, OperatorCookie);
         }
 
         private static string ReadProtected(HttpContext context, string name, string purpose)

@@ -448,7 +448,6 @@ xcopy /E /I /D /Q /Y "$(ProjectDir)EmergencyAssets" "$(SolutionDir)Deployment\Ko
     <Compile Include="EmergencyFeature\EmergencyWeb.cs" />
     <Content Include="EmergencyHome.aspx" />
     <Content Include="EmergencyLogin.aspx" />
-    <Content Include="EmergencyOperator.aspx" />
     <ProjectReference Include="..\Kombit.Samples.CH.Emergency\Kombit.Samples.CH.Emergency.csproj">
       <Project>{C5F8CA15-728D-4A02-BDBB-067EAF6DA1D9}</Project>
       <Name>Kombit.Samples.CH.Emergency</Name>

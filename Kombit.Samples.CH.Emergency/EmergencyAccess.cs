@@ -24,9 +24,9 @@ namespace Kombit.Samples.CH.Emergency
         private readonly Dictionary<string, RegistrationRelay> registrations =
             new Dictionary<string, RegistrationRelay>();
         private readonly Dictionary<string, KeyProof> proofs = new Dictionary<string, KeyProof>();
-        private readonly Dictionary<string, long> operators = new Dictionary<string, long>();
         private readonly Dictionary<string, Queue<long>> requests =
             new Dictionary<string, Queue<long>>();
+        private long lastSynchronization;
 
         public EmergencyAccess(
             EmergencySettings configuration,
@@ -48,16 +48,6 @@ namespace Kombit.Samples.CH.Emergency
         private long Now
         {
             get { return utcNow().ToUnixTimeSeconds(); }
-        }
-        public bool Accepting
-        {
-            get { return state.Inspect(data => Accepts(data)); }
-        }
-
-        private bool Accepts(JObject data)
-        {
-            return (bool)data["acceptance"]
-                && ((long)data["until"] == 0 || (long)data["until"] > Now);
         }
 
         public string RecordLogin(AcceptedSamlLogin login)
@@ -293,12 +283,7 @@ namespace Kombit.Samples.CH.Emergency
             {
                 JObject keys = (JObject)data["keys"],
                     entries = (JObject)data["credentials"];
-                if (
-                    entries.Count >= 10000
-                    || ((JArray)data["blocked_accounts"])
-                        .Values<string>()
-                        .Contains(login.AccountKey)
-                )
+                if (entries.Count >= 10000)
                 {
                     throw new EmergencyFailure(403, "local_policy_denied");
                 }
@@ -376,15 +361,10 @@ namespace Kombit.Samples.CH.Emergency
                     {
                         throw new EmergencyFailure(403, "credential_not_registered");
                     }
-                    if (login)
-                    {
-                        if (!Accepts(data))
-                        {
-                            throw new EmergencyFailure(403, "acceptance_off");
-                        }
-                    }
-                    else if (
-                        Login(normalHandle, browser, false).AccountKey != (string)entry["account"]
+                    if (
+                        !login
+                        && Login(normalHandle, browser, false).AccountKey
+                            != (string)entry["account"]
                     )
                     {
                         throw new EmergencyFailure(403, "account_mismatch");
@@ -403,7 +383,6 @@ namespace Kombit.Samples.CH.Emergency
                         Cose = (string)key["cose"],
                         Counter = (uint)key["counter"],
                         Revision = (long)key["revision"],
-                        Epoch = (long)data["epoch"],
                         Deadline = Math.Min(Now + 120, (long)entry["expires"]),
                     };
                     proof.Options = webauthn.Create(proof.Authenticator);
@@ -488,10 +467,6 @@ namespace Kombit.Samples.CH.Emergency
                         Event(data, "credential_activated");
                         return new JObject { ["ready"] = true };
                     }
-                    if (!Accepts(data) || (long)data["epoch"] != proof.Epoch)
-                    {
-                        throw new EmergencyFailure(403, "acceptance_changed");
-                    }
                     JObject sessions = (JObject)data["sessions"];
                     foreach (
                         JProperty expired in sessions
@@ -507,16 +482,11 @@ namespace Kombit.Samples.CH.Emergency
                         throw new EmergencyFailure(503, "session_capacity");
                     }
                     long end = Math.Min(Now + settings.SessionMinutes * 60, (long)entry["expires"]);
-                    if ((long)data["until"] > 0)
-                    {
-                        end = Math.Min(end, (long)data["until"]);
-                    }
                     string session = Wire.RandomId();
                     sessions[session] = new JObject
                     {
                         ["credential"] = proof.Credential,
                         ["browser"] = browser,
-                        ["epoch"] = proof.Epoch,
                         ["expires"] = end,
                     };
                     key["counter"] = (long)count;
@@ -539,13 +509,7 @@ namespace Kombit.Samples.CH.Emergency
                 throw new EmergencyFailure(403, "credential_unavailable");
             }
             JObject key = data["keys"][(string)entry["binding"]] as JObject;
-            if (
-                key == null
-                || (bool)key["blocked"]
-                || ((JArray)data["blocked_accounts"])
-                    .Values<string>()
-                    .Contains((string)entry["account"])
-            )
+            if (key == null || (bool)key["blocked"])
             {
                 throw new EmergencyFailure(403, "credential_unavailable");
             }
@@ -559,10 +523,7 @@ namespace Kombit.Samples.CH.Emergency
             {
                 throw new EmergencyFailure(404, "key_not_found");
             }
-            if (
-                (bool)key["blocked"]
-                || ((JArray)data["blocked_accounts"]).Values<string>().Contains(account)
-            )
+            if ((bool)key["blocked"])
             {
                 throw new EmergencyFailure(403, "key_blocked");
             }
@@ -582,8 +543,6 @@ namespace Kombit.Samples.CH.Emergency
                     ticket == null
                     || (string)ticket["browser"] != browser
                     || (long)ticket["expires"] <= Now
-                    || (long)ticket["epoch"] != (long)data["epoch"]
-                    || !Accepts(data)
                 )
                 {
                     return null;
@@ -614,7 +573,7 @@ namespace Kombit.Samples.CH.Emergency
                         )
                     )
                 );
-                identity.AddClaims(SnapshotPolicy.Filter((JArray)entry["claims"], settings));
+                identity.AddClaims(SnapshotPolicy.Filter((JArray)entry["claims"]));
                 string display =
                     identity.FindFirst("name")?.Value ?? identity.FindFirst(ClaimTypes.Name)?.Value;
                 if (!string.IsNullOrWhiteSpace(display))
@@ -729,127 +688,25 @@ namespace Kombit.Samples.CH.Emergency
             }
         }
 
-        public string SignInOperator(string secret)
-        {
-            if (
-                secret == null
-                || secret.Length > 512
-                || !Wire.EqualSecret(
-                    secret,
-                    EmergencySettings.Secret(settings.OperatorSecretVariable)
-                )
-            )
-            {
-                throw new EmergencyFailure(401, "operator_not_authenticated");
-            }
-            lock (state.SyncRoot)
-            {
-                Prune();
-                if (operators.Count >= 100)
-                {
-                    throw new EmergencyFailure(503, "operator_capacity");
-                }
-                string id = Wire.RandomId();
-                operators.Add(id, Now + 900);
-                return id;
-            }
-        }
-
-        public void CheckOperator(string id)
+        public async Task SynchronizeIfDue(CancellationToken cancellation)
         {
             lock (state.SyncRoot)
             {
-                long expires;
-                if (id == null || !operators.TryGetValue(id, out expires) || expires <= Now)
+                if (Now - lastSynchronization < 600)
                 {
-                    throw new EmergencyFailure(401, "operator_not_authenticated");
+                    return;
                 }
+                lastSynchronization = Now;
             }
-        }
-
-        public void SignOutOperator(string id)
-        {
-            lock (state.SyncRoot)
+            try
             {
-                if (id != null)
-                {
-                    operators.Remove(id);
-                }
+                await Synchronize(cancellation).ConfigureAwait(false);
             }
+            catch (Exception exception) when (!(exception is OperationCanceledException)) { }
         }
 
-        public JObject OperatorStatus(string id)
+        public async Task Synchronize(CancellationToken cancellation)
         {
-            CheckOperator(id);
-            return state.Inspect(data => new JObject
-            {
-                ["accepting"] = Accepts(data),
-                ["until"] = data["until"],
-                ["last_poll"] = data["last_sync"],
-                ["queued_removals"] = ((JArray)data["pending_removals"]).Count,
-                ["audit"] = data["events"].DeepClone(),
-            });
-        }
-
-        public void SetAcceptance(string id, bool enabled, int minutes)
-        {
-            CheckOperator(id);
-            if (minutes < 0 || minutes > 1440)
-            {
-                throw Wire.Invalid();
-            }
-            state.Change(data =>
-            {
-                data["acceptance"] = enabled;
-                data["epoch"] = (long)data["epoch"] + 1;
-                data["until"] = enabled && minutes != 0 ? Now + minutes * 60 : 0;
-                data["sessions"] = new JObject();
-                Event(data, enabled ? "acceptance_on" : "acceptance_off");
-                return true;
-            });
-        }
-
-        public void LocalBlock(string id, string binding, bool account)
-        {
-            CheckOperator(id);
-            state.Change(data =>
-            {
-                JObject key = data["keys"][binding] as JObject;
-                if (key == null)
-                {
-                    throw new EmergencyFailure(404, "key_not_found");
-                }
-                string subject = (string)key["account"];
-                if (account)
-                {
-                    JArray blocks = (JArray)data["blocked_accounts"];
-                    if (!blocks.Values<string>().Contains(subject))
-                    {
-                        blocks.Add(subject);
-                    }
-                    foreach (
-                        string target in ((JObject)data["keys"])
-                            .Properties()
-                            .Where(property => (string)property.Value["account"] == subject)
-                            .Select(property => property.Name)
-                            .ToArray()
-                    )
-                    {
-                        BlockKey(data, target);
-                    }
-                }
-                else
-                {
-                    BlockKey(data, binding);
-                }
-                Event(data, account ? "account_blocked" : "key_blocked");
-                return true;
-            });
-        }
-
-        public async Task Synchronize(string operatorId, CancellationToken cancellation)
-        {
-            CheckOperator(operatorId);
             JObject keys = await issuer
                 .Request(HttpMethod.Get, "emergency/signing-keys", null, cancellation)
                 .ConfigureAwait(false);
@@ -926,7 +783,6 @@ namespace Kombit.Samples.CH.Emergency
                     data["cursor"] = next;
                     if (!more)
                     {
-                        data["last_sync"] = Now;
                         Event(data, "online_sync_completed");
                     }
                     return true;
@@ -1024,15 +880,6 @@ namespace Kombit.Samples.CH.Emergency
             )
             {
                 proofs.Remove(id);
-            }
-            foreach (
-                string id in operators
-                    .Where(pair => pair.Value <= Now)
-                    .Select(pair => pair.Key)
-                    .ToArray()
-            )
-            {
-                operators.Remove(id);
             }
         }
 

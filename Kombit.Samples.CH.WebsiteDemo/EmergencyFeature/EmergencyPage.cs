@@ -11,9 +11,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
     {
         public string Mode { get; private set; }
         public string CsrfToken { get; private set; }
-        public bool Accepting { get; private set; }
         public bool CanPrepare { get; private set; }
-        public bool OperatorAuthenticated { get; private set; }
         public ClaimsPrincipal EmergencyUser
         {
             get { return Context.User as ClaimsPrincipal; }
@@ -32,11 +30,8 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                     file.Equals("Emergency.aspx", StringComparison.OrdinalIgnoreCase) ? "prepare"
                     : file.Equals("EmergencyLogin.aspx", StringComparison.OrdinalIgnoreCase)
                         ? "login"
-                    : file.Equals("EmergencyOperator.aspx", StringComparison.OrdinalIgnoreCase)
-                        ? "operator"
                     : file.Equals("EmergencyHome.aspx", StringComparison.OrdinalIgnoreCase) ? "home"
                     : "ended";
-                Accepting = EmergencyWeb.Accepting;
                 if (Mode == "prepare")
                 {
                     CanPrepare = EmergencyWeb.Service.CanPrepare(
@@ -47,19 +42,6 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 if (Mode == "home" && !EmergencyWeb.IsEmergency(Context))
                 {
                     Response.Redirect(ResolveUrl("~/EmergencyEnded.aspx"), true);
-                }
-                if (Mode == "login" && !Accepting)
-                {
-                    Response.StatusCode = 403;
-                }
-                if (Mode == "operator")
-                {
-                    try
-                    {
-                        EmergencyWeb.OperatorId(Context);
-                        OperatorAuthenticated = true;
-                    }
-                    catch (EmergencyFailure) { }
                 }
                 CsrfToken = EmergencyWeb.Csrf(Context);
             }

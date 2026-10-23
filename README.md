@@ -81,4 +81,4 @@ If the WSDL changes, regenerate the reference with the .NET Framework 4.8 `SvcUt
 
 ## Optional emergency access
 
-Emergency support is disabled by default. See [the emergency PoC guide](README-emergency.md) for configuration, preparation, local operator controls, tests, and known limits.
+Emergency support is disabled by default. See [the emergency PoC guide](README-emergency.md) for configuration, preparation, tests, and known limits.

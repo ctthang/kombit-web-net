@@ -12,22 +12,14 @@ namespace Kombit.Samples.CH.Emergency.Tests
     public class EmergencyAccessTests
     {
         [DataTestMethod]
-        [DataRow(false, false)]
-        [DataRow(true, false)]
-        [DataRow(false, true)]
-        [DataRow(true, true)]
-        public async Task Lifecycle_OfflineRestartAndAcceptance_EnforcesLocalSession(
-            bool ec,
-            bool preserve
-        )
+        [DataRow(false)]
+        [DataRow(true)]
+        public async Task Lifecycle_OfflineRestart_EnforcesLocalSession(bool ec)
         {
             // Arrange
             using (SamlFixture fixture = new SamlFixture(ec))
             {
-                fixture.Settings.PreserveNormalClaims = preserve;
                 JObject entry = await fixture.Active();
-                string op = fixture.Access.SignInOperator(fixture.OperatorSecret);
-                fixture.Access.SetAcceptance(op, true, 60);
                 fixture.Offline = true;
                 int calls = fixture.Calls;
                 // Act
@@ -38,20 +30,23 @@ namespace Kombit.Samples.CH.Emergency.Tests
                     fixture.Browser
                 );
                 // Assert
-                Assert.AreEqual(preserve ? 2 : 0, principal.FindAll("department").Count());
-                Assert.AreEqual(
-                    preserve ? "Synthetic User" : "Prepared user",
-                    principal.Identity.Name
-                );
+                Assert.AreEqual(2, principal.FindAll("department").Count());
+                Assert.AreEqual("Synthetic User", principal.Identity.Name);
                 Assert.IsNotNull(principal);
-                Assert.IsFalse(principal.IsInRole("case-admin"));
+                Assert.IsTrue(principal.IsInRole("case-admin"));
                 Assert.IsFalse(principal.Claims.Any(claim => claim.Value == "normal-evidence"));
                 Assert.AreEqual(calls, fixture.Calls);
                 Assert.IsNull(principal.FindFirst("acr"));
                 Assert.IsNull(principal.FindFirst("access_token"));
                 CollectionAssert.AreEquivalent(
-                    new[] { "read-only" },
+                    new[] { "case-admin", "read-only", "administrator" },
                     principal.FindAll("role").Select(claim => claim.Value).ToArray()
+                );
+                Assert.AreEqual(
+                    "PFByaXZpbGVnZUxpc3QvPg==",
+                    principal
+                        .FindFirst("https://data.gov.dk/model/core/eid/privilegesIntermediate")
+                        .Value
                 );
                 Assert.AreEqual(
                     (string)ticket["session"],
@@ -60,9 +55,7 @@ namespace Kombit.Samples.CH.Emergency.Tests
                 Assert.IsNull(
                     fixture.Access.Authenticate((string)ticket["session"], "wrong-browser")
                 );
-                op = fixture.Access.SignInOperator(fixture.OperatorSecret);
-                fixture.Access.SetAcceptance(op, false, 0);
-                fixture.Access.SetAcceptance(op, true, 60);
+                fixture.Access.EndSession((string)ticket["session"]);
                 Assert.IsNull(
                     fixture.Access.Authenticate((string)ticket["session"], fixture.Browser)
                 );
@@ -174,11 +167,6 @@ namespace Kombit.Samples.CH.Emergency.Tests
                     fixture.Binding,
                     CancellationToken.None
                 );
-                fixture.Access.SetAcceptance(
-                    fixture.Access.SignInOperator(fixture.OperatorSecret),
-                    true,
-                    60
-                );
                 JObject ticket = await fixture.Prove(old, true, null, 2);
                 Assert.ThrowsExactly<EmergencyFailure>(() =>
                     fixture.Access.StartProof(
@@ -211,12 +199,7 @@ namespace Kombit.Samples.CH.Emergency.Tests
             using (SamlFixture fixture = new SamlFixture())
             {
                 JObject entry = await fixture.Active();
-                fixture.Access.SetAcceptance(
-                    fixture.Access.SignInOperator(fixture.OperatorSecret),
-                    true,
-                    60
-                );
-                JObject a = fixture.Access.StartProof(
+                JObject a =fixture.Access.StartProof(
                         fixture.Browser,
                         (string)entry["emergency_credential"],
                         true,
@@ -257,8 +240,6 @@ namespace Kombit.Samples.CH.Emergency.Tests
             {
                 JObject entry = await fixture.Active();
                 string normal = fixture.Login();
-                string op = fixture.Access.SignInOperator(fixture.OperatorSecret);
-                fixture.Access.SetAcceptance(op, true, 60);
                 JObject ticket = await fixture.Prove(entry, true, null, 2);
                 fixture.Offline = true;
                 // Act
@@ -272,31 +253,29 @@ namespace Kombit.Samples.CH.Emergency.Tests
                 Assert.IsNull(
                     fixture.Access.Authenticate((string)ticket["session"], fixture.Browser)
                 );
-                Assert.AreEqual(1, (int)fixture.Access.OperatorStatus(op)["queued_removals"]);
                 fixture.Restart();
                 Assert.IsNull(
                     fixture.Access.Authenticate((string)ticket["session"], fixture.Browser)
                 );
                 fixture.Offline = false;
-                op = fixture.Access.SignInOperator(fixture.OperatorSecret);
-                await fixture.Access.Synchronize(op, CancellationToken.None);
-                Assert.AreEqual(0, (int)fixture.Access.OperatorStatus(op)["queued_removals"]);
+                int calls = fixture.Calls;
+                await fixture.Access.SynchronizeIfDue(CancellationToken.None);
+                // Signing keys, the queued removal report, and the revocation feed.
+                Assert.AreEqual(calls + 3, fixture.Calls);
+                await fixture.Access.SynchronizeIfDue(CancellationToken.None);
+                Assert.AreEqual(calls + 3, fixture.Calls);
             }
         }
 
         [TestMethod]
-        public async Task DisabledMarkerAndTransientEvidence_RequireExplicitActivationAndNewLogin()
+        public async Task DisabledMarkerAndTransientEvidence_EndSessionsAndRequireNewLogin()
         {
             // Arrange
             using (SamlFixture fixture = new SamlFixture())
             {
                 JObject active = await fixture.Active();
                 string normal = fixture.Login();
-                fixture.Access.SetAcceptance(
-                    fixture.Access.SignInOperator(fixture.OperatorSecret),
-                    true,
-                    60
-                );
+                JObject ticket = await fixture.Prove(active, true, null, 2);
                 // Act
                 File.WriteAllText(
                     Path.Combine(fixture.Settings.StateDirectory, "support-disabled"),
@@ -304,14 +283,11 @@ namespace Kombit.Samples.CH.Emergency.Tests
                 );
                 fixture.Restart();
                 // Assert
-                Assert.IsFalse(fixture.Access.Accepting);
-                Assert.IsFalse(fixture.Access.CanPrepare(normal, fixture.Browser));
-                fixture.Access.SetAcceptance(
-                    fixture.Access.SignInOperator(fixture.OperatorSecret),
-                    true,
-                    60
+                Assert.IsNull(
+                    fixture.Access.Authenticate((string)ticket["session"], fixture.Browser)
                 );
-                Assert.IsNotNull(await fixture.Prove(active, true, null, 2));
+                Assert.IsFalse(fixture.Access.CanPrepare(normal, fixture.Browser));
+                Assert.IsNotNull(await fixture.Prove(active, true, null, 3));
                 normal = fixture.Login();
                 fixture.Time = fixture.Time.AddSeconds(601);
                 await Assert.ThrowsExactlyAsync<EmergencyFailure>(() =>

@@ -12,8 +12,6 @@ namespace Kombit.Samples.CH.Emergency.Tests
             // Arrange
             using (SamlFixture fixture = new SamlFixture())
             {
-                string operatorId = fixture.Access.SignInOperator(fixture.OperatorSecret);
-                fixture.Access.SetAcceptance(operatorId, true, 60);
                 using (
                     FileStream held = new FileStream(
                         Path.Combine(fixture.Settings.StateDirectory, "registry.bin"),
@@ -25,16 +23,15 @@ namespace Kombit.Samples.CH.Emergency.Tests
                 {
                     // Act
                     Assert.ThrowsExactly<IOException>(() =>
-                        fixture.Access.SetAcceptance(operatorId, false, 0)
+                        fixture.Access.EndSession(Wire.RandomId())
                     );
                     // Assert
                     Assert.AreEqual(
                         503,
                         Assert
                             .ThrowsExactly<EmergencyFailure>(() =>
-                            {
-                                bool allowed = fixture.Access.Accepting;
-                            })
+                                fixture.Access.Authenticate(Wire.RandomId(), fixture.Browser)
+                            )
                             .StatusCode
                     );
                 }

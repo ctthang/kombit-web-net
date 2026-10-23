@@ -20,7 +20,6 @@ This guide records the local setup for `https://kombitspnew.safewhere.local/`. C
 | WebAuthn origin | `https://kombitspnew.safewhere.local` |
 | WebAuthn RP ID | `kombitspnew.safewhere.local` |
 | Backend secret variable | `SAML_EMERGENCY_ISSUER_KEY` |
-| Operator secret variable | `SAML_EMERGENCY_OPERATOR_KEY` |
 | External file directory | `C:\ProgramData\SafewhereSamples\SamlEmergency\dev520-kombitspnew` |
 
 The issuer was checked against the deployed `metadata\dev520.xml`; the SP entity ID was checked against the deployed `Web.config`. Preserve their exact spelling and trailing-slash differences.
@@ -65,7 +64,7 @@ Issue("https://data.gov.dk/model/core/eid/privilegesIntermediate",
     System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(bppXml)));
 ```
 
-These are illustrative values for a local test. The BPP XML was checked with the sample's parser. The profile validator checks presence rather than complete profile conformance. Email is optional only for `Profile=KOMBIT_WITHOUT_PERSONAL_DATA`; CPR is optional and is unnecessary for the emergency test. Configure NameID separately according to the normal SP configuration. Do not fabricate a bootstrap token for emergency testing; STS exchange and service-token calls are separate normal-login features.
+These are illustrative values for a local test. The profile validator checks presence rather than complete profile conformance. Email is optional only for `Profile=KOMBIT_WITHOUT_PERSONAL_DATA`; CPR is optional and is unnecessary for the emergency test. Configure NameID separately according to the normal SP configuration. Do not fabricate a bootstrap token for emergency testing; STS exchange and service-token calls are separate normal-login features.
 
 ## 3. Prepare the SAML application's external settings
 
@@ -88,24 +87,11 @@ Its root is the settings object itself. It does **not** have the OIDC sample's `
   "EncryptionKeyId": "saml-emergency-encryption",
   "InitialSigningKeysFile": "C:\\ProgramData\\SafewhereSamples\\SamlEmergency\\dev520-kombitspnew\\issuer-signing-keys.json",
   "BackendSecretVariable": "SAML_EMERGENCY_ISSUER_KEY",
-  "OperatorSecretVariable": "SAML_EMERGENCY_OPERATOR_KEY",
-  "PreserveNormalClaims": true,
-  "ClaimTypes": [
-    "https://data.gov.dk/model/core/specVersion",
-    "https://data.gov.dk/model/core/eid/privilegesIntermediate",
-    "https://data.gov.dk/model/core/eid/email",
-    "https://data.gov.dk/model/core/eid/professional/cvr",
-    "https://data.gov.dk/model/core/eid/professional/orgName",
-    "dk:gov:saml:attribute:KombitSpecVer"
-  ],
-  "Roles": [],
-  "Privileges": ["urn:example:kombit:read"],
-  "PrivilegeScopes": ["urn:dk:gov:saml:cvr:12345678"],
   "SessionMinutes": 480
 }
 ```
 
-The privilege and scope entries above match the synthetic BPP example. For a different test, replace both with explicitly permitted values. An empty privilege or scope list grants no BPP privileges. Normal LoA is deliberately excluded from emergency claims; the emergency session supplies `local_assurance=emergency-possession`. `PreserveNormalClaims` keeps ordinary assertion claim types while role, privilege, and assurance filters still apply.
+Roles and BPP privileges from the normal assertion pass through to the emergency session unchanged. Normal LoA is deliberately excluded from emergency claims; the emergency session supplies `local_assurance=emergency-possession`. All other ordinary assertion claims are preserved; only assurance, token, and reserved emergency claims are removed.
 
 Unlike OIDC's local access-token snapshot, this SAML sample uses the signed assertion claim snapshot carried by Identify's emergency credential. Do not add `UseNormalAccessTokenClaims` to the SAML JSON; its loader rejects unknown properties.
 
@@ -118,11 +104,9 @@ Invoke-WebRequest 'https://dev520.safewhere.local/runtime/emergency/signing-keys
 
 Do not bypass certificate validation if this fails. Correct the HTTPS binding/trust first. The key directory was provisioned for administrators, the creating user, SYSTEM, and `IIS APPPOOL\kombitspnew.safewhere.local`. Keep those restrictive permissions on the settings, keys, and state. Ensure the application's pool SID can read the files and modify its state directory.
 
-## 4. Provision the local operator secret and machine key
+## 4. Provision the machine key
 
-The existing SAML backend secret must be reused. Do not replace the OIDC backend or operator variables. The SAML operator uses a separate random secret; it must differ from the backend secret.
-
-Provision `SAML_EMERGENCY_OPERATOR_KEY` securely in the machine environment and an explicit environment entry for pool `kombitspnew.safewhere.local`. Generate a cryptographically random value of at least 32 characters only if the SAML operator key does not exist. An interactive PowerShell variable alone is not visible to an independently started IIS worker. Never print either secret or add it to JSON/source control.
+The existing SAML backend secret must be reused. Do not replace the OIDC backend variables. The SAML client no longer uses an operator secret.
 
 Provision a stable application-specific ASP.NET `machineKey` using IIS server-level configuration or a protected external deployment configuration. `AutoGenerate` is rejected by enabled emergency support. Preserve the machine key across restarts and redeployments; it protects this client's durable state and cookies. Do not copy a machine key from another sample or commit generated key values.
 
@@ -143,7 +127,7 @@ Add or update these entries inside the deployed `Web.config`'s existing `<appSet
 
 The state directory must match the external JSON. Neither that JSON nor its contents belong inside the web root.
 
-Stop/start `Identify dev520` once to load the new issuer client and backend environment entry. Start the SAML pool after its settings, trust keys, machine key, and operator variable are ready. Use stop/wait/start rather than an overlapping recycle because each PoC state file has one writer. No Identify OAuth2 source modification is needed for this SAML configuration.
+Stop/start `Identify dev520` once to load the new issuer client and backend environment entry. Start the SAML pool after its settings, trust keys, and machine key are ready. Use stop/wait/start rather than an overlapping recycle because each PoC state file has one writer. No Identify OAuth2 source modification is needed for this SAML configuration.
 
 ## 6. Test preparation and emergency access
 
@@ -151,18 +135,11 @@ Stop/start `Identify dev520` once to load the new issuer client and backend envi
 2. In the same browser/profile, open `https://kombitspnew.safewhere.local/Emergency.aspx` and choose **Prepare this browser**. For an existing active credential, use renewal after a fresh normal login instead of generating another key.
 3. Complete authenticator registration, browser storage/read-back, and the separate possession check. Wait for **Ready**. Keep using a key with user verification and no passkey backup.
 4. Expand **Identify endpoint results (PoC)** and confirm the enrollment/completion or renewal responses. A successful response alone is not readiness.
-5. Open `https://kombitspnew.safewhere.local/EmergencyOperator.aspx`, sign in locally with the SAML operator key, and enable acceptance for ten minutes for the test.
-6. Open `https://kombitspnew.safewhere.local/EmergencyLogin.aspx`, choose the newest prepared credential, and complete the key check.
-7. On `EmergencyHome.aspx`, verify identity/organisation claims and the explicitly allowed BPP privilege. Normal LoA and bootstrap tokens must be absent. Existing role and privilege restrictions still apply.
-8. Use **Sign out locally**. Normal federation logout and STS/service-token actions are unavailable during emergency access.
+5. Open `https://kombitspnew.safewhere.local/EmergencyLogin.aspx`, choose the newest prepared credential, and complete the key check.
+6. On `EmergencyHome.aspx`, verify identity/organisation claims and the BPP privilege from the normal assertion. Normal LoA and bootstrap tokens must be absent.
+7. Use **Sign out locally**. Normal federation logout and STS/service-token actions are unavailable during emergency access.
 
-To copy the operator key without displaying it, run locally immediately before pasting it into the operator page:
-
-```powershell
-[Environment]::GetEnvironmentVariable('SAML_EMERGENCY_OPERATOR_KEY', 'Machine') | Set-Clipboard
-```
-
-Opening the operator or emergency-login page does not enable acceptance. Enabling issuer issuance also does not enable acceptance in the SAML client. No outage simulation or Identify pool shutdown is needed for this first test.
+A prepared browser can use emergency login immediately; no local activation step is needed. No outage simulation or Identify pool shutdown is needed for this first test.
 
 ## Troubleshooting
 
@@ -172,8 +149,8 @@ Opening the operator or emergency-login page does not enable acceptance. Enablin
 | Preparation requires a new normal login | Use dev520 and complete a fresh login; references last ten minutes and are consumed by enrollment. |
 | Issuer rejects enrollment | Match connection GUID, SP entity ID, and exact normal issuer, including the trailing slash. |
 | `client_not_authenticated` | Match `SAML_EMERGENCY_ISSUER_KEY` in both pool environments and restart workers after changing entries. |
-| `emergency_unavailable` | Check stable machine key, external file paths, ACLs, and matching 64-bit/native dependencies. |
-| BPP absent in emergency claims | Populate both `Privileges` and `PrivilegeScopes` with values present in the normal assertion, then renew. |
+| `emergency_unavailable` | Check stable machine key, external file paths, ACLs, and matching 64-bit/native dependencies. Remove `OperatorSecretVariable`, `PreserveNormalClaims`, `ClaimTypes`, `Roles`, `Privileges`, and `PrivilegeScopes` from settings files created for earlier versions. |
+| BPP absent in emergency claims | Confirm the normal assertion carries `privilegesIntermediate` and Identify's issuer client has `PreserveNormalClaims` enabled, then renew. |
 | Claims remain old after a configuration change | Fresh normal login, credential renewal, possession check, then login using the newest credential. |
 | `csrf_rejected` | Reload the page, then retry with the freshly issued CSRF token. |
 | No credential in this browser | Use the original browser/profile; clearing site data removes the stored credential. |
@@ -226,3 +203,7 @@ All four redirects now match the installed assembly identities; the three missin
 After fresh dev520 SAML login, **Confirm stored credential** succeeded in the embedded browser. The existing credential is active and the page reports **Ready**; no second binding was created. The operator page is open for explicit acceptance activation. Emergency login and its final claim display remain pending at this point.
 
 For future verification failures, the client writes a bounded `state\proof-diagnostic.json` with only the stage, exception type, inner exception type, and a fixed reason category. It contains no challenges, assertions, signatures, token values, keys, or personal claims. Access remains restricted by the state directory's ACL. User-facing errors remain generic.
+
+## Operator role removed
+ local operator page, emergency acceptance switch, local account/key blocking, and operator secret were removed from the SAML client. The operator steps recorded above are historical. A browser can log in with its emergency credential as soon as preparation reports **Ready**. Synchronization with Identify now runs automatically, at most every ten minutes, when the preparation page loads key status.
+ deploying this version to kombitspnew, delete the `OperatorSecretVariable`, `PreserveNormalClaims`, `ClaimTypes`, `Roles`, `Privileges`, and `PrivilegeScopes` properties from `settings.json`; the loader rejects unknown properties. Normal-login claims, including roles and privileges, are now always preserved unchanged. Keep `PreserveNormalClaims` enabled on the Identify issuer client. The `SAML_EMERGENCY_OPERATOR_KEY` machine and pool environment entries are no longer read and can be removed.

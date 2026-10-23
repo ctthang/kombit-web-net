@@ -193,11 +193,6 @@ main {
     gap: 0.5rem;
 }
 
-.stack {
-    display: grid;
-    gap: 1rem;
-}
-
 .card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -376,63 +371,6 @@ button:disabled:hover {
     margin-top: 0.75rem;
 }
 
-/* Forms */
-
-.field {
-    display: grid;
-    gap: 0.3rem;
-    margin-bottom: 0.75rem;
-    max-width: 28rem;
-}
-
-.field.grow {
-    flex: 1 1 16rem;
-    margin-bottom: 0;
-}
-
-label {
-    font-weight: 600;
-}
-
-input:not([type='checkbox']) {
-    width: 100%;
-    min-height: 2.5rem;
-    padding: 0.45rem 0.7rem;
-    border: 1px solid var(--border-strong);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
-}
-
-input[type='number'] {
-    max-width: 10rem;
-}
-
-#binding-id {
-    font-family: var(--mono);
-}
-
-.check {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 400;
-}
-
-.check input {
-    width: 1.1rem;
-    height: 1.1rem;
-    margin: 0;
-}
-
-.inline-form {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: 0.75rem;
-}
-
 /* Preparation steps */
 
 .steps {
@@ -515,22 +453,11 @@ input[type='number'] {
     margin-top: 0.25rem;
 }
 
-.empty,
-.empty-state {
+.empty {
     padding: 1rem;
     border: 1px dashed var(--border-strong);
     border-radius: 8px;
     color: var(--text-muted);
-}
-
-.empty-state {
-    display: grid;
-    justify-items: start;
-    gap: 0.5rem;
-}
-
-.empty-state p {
-    margin: 0;
 }
 
 code,
@@ -555,7 +482,6 @@ code,
     text-transform: uppercase;
 }
 
-.badge.on,
 .badge.active {
     border-color: var(--success);
     background: var(--success-soft);
@@ -568,7 +494,6 @@ code,
     color: var(--warning);
 }
 
-.badge.off,
 .badge.blocked,
 .badge.removed,
 .badge.revoked,

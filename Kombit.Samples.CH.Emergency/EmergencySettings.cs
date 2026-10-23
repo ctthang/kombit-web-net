@@ -17,13 +17,6 @@ namespace Kombit.Samples.CH.Emergency
         public string EncryptionKeyId { get; set; }
         public string InitialSigningKeysFile { get; set; }
         public string BackendSecretVariable { get; set; } = "SAML_EMERGENCY_ISSUER_KEY";
-        public string OperatorSecretVariable { get; set; } = "SAML_EMERGENCY_OPERATOR_KEY";
-        public bool PreserveNormalClaims { get; set; }
-        public string[] ClaimTypes { get; set; } =
-            new[] { "https://data.gov.dk/model/core/eid/email" };
-        public string[] Roles { get; set; } = new string[0];
-        public string[] Privileges { get; set; } = new string[0];
-        public string[] PrivilegeScopes { get; set; } = new string[0];
         public int SessionMinutes { get; set; } = 480;
 
         public void Validate(string applicationDirectory)
@@ -43,11 +36,6 @@ namespace Kombit.Samples.CH.Emergency
                 || string.IsNullOrWhiteSpace(EncryptionKeyId)
                 || SessionMinutes < 1
                 || SessionMinutes > 480
-                || ClaimTypes == null
-                || ClaimTypes.Length > 100
-                || Roles == null
-                || Privileges == null
-                || PrivilegeScopes == null
             )
             {
                 throw new InvalidOperationException("Invalid emergency configuration.");
@@ -64,7 +52,6 @@ namespace Kombit.Samples.CH.Emergency
                 CheckExternalPath(path, applicationDirectory);
             }
             Secret(BackendSecretVariable);
-            Secret(OperatorSecretVariable);
         }
 
         private static bool Https(string value)

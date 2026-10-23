@@ -20,11 +20,10 @@
             <a href="<%= ResolveUrl("~/Default.aspx") %>">Normal application</a>
             <a href="<%= ResolveUrl("~/Emergency.aspx") %>" <% if (view.Mode == "prepare") { %>aria-current="page"<% } %>>Prepare</a>
             <a href="<%= ResolveUrl("~/EmergencyLogin.aspx") %>" <% if (view.Mode == "login") { %>aria-current="page"<% } %>>Emergency login</a>
-            <a href="<%= ResolveUrl("~/EmergencyOperator.aspx") %>" <% if (view.Mode == "operator") { %>aria-current="page"<% } %>>Local operator</a>
         </nav>
     </div>
 </header>
-<main id="saml-emergency" data-api="<%= ResolveUrl("~/EmergencyApi.ashx") %>" data-mode="<%: view.Mode %>" data-accepting="<%: view.Accepting ? "true" : "false" %>">
+<main id="saml-emergency" data-api="<%= ResolveUrl("~/EmergencyApi.ashx") %>" data-mode="<%: view.Mode %>">
     <div class="page-head">
         <h1>Emergency access</h1>
         <p class="notice"><strong>Proof of concept.</strong> Emergency access uses local key verification. It does not provide normal NSIS assurance.</p>
@@ -53,79 +52,15 @@
         <h2>Keys stored in this browser</h2>
         <p id="storage-note" class="hint">Clearing or evicting site data loses preparation. A different browser profile is not prepared.</p>
         <ul id="saved-keys" class="key-list"><li class="empty">Loading stored keys…</li></ul>
-        <p class="hint">If issuance succeeded but storage or delivery failed, its binding can still count towards the issuer's key limit. Ask the operator to remove the binding before trying again.</p>
+        <p class="hint">If issuance succeeded but storage or delivery failed, its binding can still count towards the issuer's key limit. Ask an Identify administrator to remove the binding before trying again.</p>
     </section>
 
 <% } else if (view.Mode == "login") { %>
     <section class="card">
         <h2>Local emergency login</h2>
-    <% if (view.Accepting) { %>
         <p class="lead">Select a locally stored credential. This page and the key check do not contact Identify.</p>
         <ul id="saved-keys" class="key-list"><li class="empty">Loading stored keys…</li></ul>
-    <% } else { %>
-        <div class="empty-state">
-            <span class="badge off">Acceptance off</span>
-            <p>Emergency acceptance is off. A local operator must enable it first.</p>
-        </div>
-    <% } %>
     </section>
-
-<% } else if (view.Mode == "operator") { %>
-    <section class="card" <% if (view.OperatorAuthenticated) { %>hidden<% } %>>
-        <h2>Local operator sign-in</h2>
-        <p class="lead">Operator sessions last 15 minutes. Keep the operator key outside source control.</p>
-        <form id="operator-form" class="inline-form" method="post">
-            <div class="field grow">
-                <label for="operator-key">Operator key</label>
-                <input id="operator-key" type="password" autocomplete="current-password" maxlength="512" required />
-            </div>
-            <button class="primary">Sign in locally</button>
-        </form>
-    </section>
-    <div id="operator-panel" class="stack" <% if (!view.OperatorAuthenticated) { %>hidden<% } %>>
-        <section class="card">
-            <div class="card-head">
-                <h2>Local operator</h2>
-                <button id="operator-exit" class="secondary" type="button">Sign out operator</button>
-            </div>
-            <dl id="operator-status" class="stats"></dl>
-        </section>
-        <section class="card">
-            <h3>Emergency acceptance</h3>
-            <div class="field">
-                <label for="duration">Acceptance duration in minutes</label>
-                <input id="duration" type="number" min="0" max="1440" value="60" aria-describedby="duration-hint" />
-                <span id="duration-hint" class="hint">0 means the window has no end.</span>
-            </div>
-            <div class="actions">
-                <button id="enable" class="primary" type="button">Enable emergency acceptance</button>
-                <button id="disable" class="danger" type="button">Stop acceptance and emergency sessions</button>
-            </div>
-        </section>
-        <section class="card">
-            <h3>Block locally</h3>
-            <div class="field">
-                <label for="binding-id">Binding ID</label>
-                <input id="binding-id" maxlength="128" spellcheck="false" autocomplete="off" aria-describedby="binding-hint" />
-                <span id="binding-hint" class="hint">Shown with each key on the preparation page.</span>
-            </div>
-            <label class="check"><input id="block-account" type="checkbox" /> Block all keys of the account</label>
-            <div class="actions">
-                <button id="block" class="danger" type="button">Apply local block</button>
-            </div>
-        </section>
-        <section class="card">
-            <h3>Explicit online synchronization</h3>
-            <p class="hint">This operation contacts Identify for signing keys, central revocations, and queued key removal reports. The emergency login flow does not call it.</p>
-            <div class="actions">
-                <button id="sync" class="secondary" type="button">Synchronize with Identify now</button>
-            </div>
-        </section>
-        <section class="card">
-            <h3>Recent events</h3>
-            <ul id="events" class="log"></ul>
-        </section>
-    </div>
 
 <% } else if (view.Mode == "home") { %>
     <section class="card">
@@ -148,7 +83,7 @@
 <% } else { %>
     <section class="card">
         <h2>Session ended</h2>
-        <p>Your session expired or local acceptance is unavailable. A new key check is required when the operator enables access.</p>
+        <p>Your emergency session expired or was ended. Log in again with a prepared key to continue.</p>
         <div class="actions">
             <a class="button primary" href="<%= ResolveUrl("~/EmergencyLogin.aspx") %>">Go to emergency login</a>
             <a class="button secondary" href="<%= ResolveUrl("~/Default.aspx") %>">Normal application</a>
