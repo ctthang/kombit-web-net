@@ -44,6 +44,16 @@ Claims from the normal login are always preserved, including roles and `privileg
 
 To disable support, retain the settings/state-path entries, set `EmergencyCredential.Enabled=false`, and restart. Startup marks existing state so that existing emergency sessions are ended on the next enabled start, without loading the private key. Prepared browsers can log in again after re-enabling. Removing path settings is not the supported disable procedure.
 
+## Error logs and reference IDs
+
+Emergency failures use the existing log4net configuration in `Web.config`; no separate emergency log file is created. The sample's configured rolling-file appender writes to `log.txt`. Use the deployment's actual appender location and ensure its directory is writable by the application identity and readable only by approved administrators. Keep production logs outside publicly accessible web content.
+
+The error page and browser action errors show a reference ID. API errors also include `reference_id` in JSON and `X-Emergency-Reference` in the response headers. Search the existing application logs for that ID to find the matching `emergency_failure` JSON event. Include the reference ID, time, error code, HTTP status, and attempted action in support reports, never the credential or token.
+
+Events include UTC time, the error code and safe explanation, HTTP status, a normalized endpoint and recognized operation, exception types and HResults, and bounded method/line stack locations including inner causes. API failures also include the existing sanitized issuer-call diagnostics, including actual issuer HTTP statuses and endpoint templates. Client rejections are warnings; server-side failures are errors. Initialization, disabled-state marker, normal-login capture, and session-authentication exceptions are logged even when normal login or session cleanup continues.
+
+Raw exception messages, exception `Data`, stack source paths, request bodies, arbitrary URL/query values, cookies, credentials, and issuer response bodies are deliberately omitted because they can contain secrets or personal data. Public responses never include the exception details. If a reference cannot be found, check the configured log level, appender location, and file permissions. A logging failure does not replace the original response or prevent normal authentication; a best-effort Trace fallback records only the reference ID.
+
 ## Build, package, and test
 
 Use Visual Studio MSBuild. To compile without the existing deployment-copy event:

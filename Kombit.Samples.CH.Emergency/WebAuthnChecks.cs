@@ -171,7 +171,7 @@ namespace Kombit.Samples.CH.Emergency
                     );
                 }
                 catch (Exception) { }
-                throw new EmergencyFailure(400, "key_proof_rejected");
+                throw new EmergencyFailure(400, "key_proof_rejected", exception);
             }
         }
     }

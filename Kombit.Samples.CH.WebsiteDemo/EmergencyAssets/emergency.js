@@ -127,7 +127,23 @@
         });
         recordIssuerCalls(response);
         const value = await response.json();
-        if (!response.ok) throw new Error(describe(value.error || 'Request failed'));
+        if (!response.ok) {
+            const code = value.error || 'Request failed';
+            const message = typeof value.message === 'string' ? value.message : describe(code);
+            const reference =
+                typeof value.reference_id === 'string'
+                    ? value.reference_id
+                    : response.headers.get('X-Emergency-Reference');
+            throw new Error(
+                message +
+                    ' (Error: ' +
+                    code +
+                    '; HTTP ' +
+                    response.status +
+                    (reference ? '; Reference: ' + reference : '') +
+                    ')',
+            );
+        }
         return value;
     }
     function action(operation) {

@@ -441,6 +441,7 @@ xcopy /E /I /D /Q /Y "$(ProjectDir)EmergencyAssets" "$(SolutionDir)Deployment\Ko
     <Content Include="EmergencyAssets\emergency.js" />
     <Content Include="EmergencyEnded.aspx" />
     <Compile Include="EmergencyFeature\EmergencyApi.cs" />
+    <Compile Include="EmergencyFeature\EmergencyDiagnostics.cs" />
     <Compile Include="EmergencyFeature\EmergencyNormalLoginAction.cs" />
     <Compile Include="EmergencyFeature\EmergencyPage.cs">
       <SubType>ASPXCodeBehind</SubType>

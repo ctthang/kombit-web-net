@@ -65,11 +65,9 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 SessionStore.CurrentSession[EmergencyWeb.LoginHandle] =
                     EmergencyWeb.Service.RecordLogin(login);
             }
-            catch (Exception)
+            catch (Exception exception)
             {
-                System.Diagnostics.Trace.TraceWarning(
-                    "Emergency preparation reference unavailable; normal SAML login continues."
-                );
+                EmergencyDiagnostics.Log(context, 503, "normal_login_capture_failed", exception);
             }
         }
 

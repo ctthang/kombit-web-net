@@ -203,7 +203,7 @@ namespace Kombit.Samples.CH.Emergency
             }
             catch (Exception exception) when (!(exception is EmergencyFailure))
             {
-                throw new EmergencyFailure(400, "credential_rejected");
+                throw new EmergencyFailure(400, "credential_rejected", exception);
             }
         }
 

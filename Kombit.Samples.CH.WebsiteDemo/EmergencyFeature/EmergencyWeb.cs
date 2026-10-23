@@ -88,11 +88,9 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                     File.WriteAllText(Path.Combine(directory, "support-disabled"), "1");
                 }
             }
-            catch (Exception)
+            catch (Exception exception)
             {
-                System.Diagnostics.Trace.TraceWarning(
-                    "Emergency disabled-state marker unavailable; local recovery required."
-                );
+                EmergencyDiagnostics.Log(null, 503, "disabled_state_marker_failed", exception);
             }
         }
 
@@ -179,13 +177,13 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                     );
                     pendingStore = null;
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
                     if (pendingStore != null)
                     {
                         pendingStore.Dispose();
                     }
-                    throw new EmergencyFailure(503, "emergency_unavailable");
+                    throw new EmergencyFailure(503, "emergency_unavailable", exception);
                 }
             }
         }
@@ -222,7 +220,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 }
                 catch (EmergencyFailure failure)
                 {
-                    Error(context, failure.StatusCode, failure.ErrorCode);
+                    Error(context, failure.StatusCode, failure.ErrorCode, failure);
                     context.ApplicationInstance.CompleteRequest();
                     return;
                 }
@@ -258,8 +256,9 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                     Ended(context);
                 }
             }
-            catch (Exception)
+            catch (Exception exception)
             {
+                EmergencyDiagnostics.Log(context, 503, "session_authentication_failed", exception);
                 ClearCookie(context, SessionCookie);
                 Ended(context);
             }
@@ -505,14 +504,53 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
             );
         }
 
-        public static void Error(HttpContext context, int status, string code)
+        public static void Error(
+            HttpContext context,
+            int status,
+            string code,
+            Exception exception = null,
+            object[] issuerCalls = null
+        )
         {
+            var failure = new EmergencyFailure(status, code);
+            string reference = EmergencyDiagnostics.Log(context, status, code, exception, issuerCalls);
             context.Response.StatusCode = status;
-            context.Response.ContentType = "application/json";
+            context.Response.Headers["X-Emergency-Reference"] = reference;
             context.Response.SuppressFormsAuthenticationRedirect = true;
             context.Response.TrySkipIisCustomErrors = true;
+            if (status == 429)
+            {
+                context.Response.Headers["Retry-After"] = "60";
+            }
+            if (context.Request.Path.EndsWith(".aspx", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.ContentType = "text/html";
+                context.Response.Write(
+                    "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+                        + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                        + "<title>Emergency access error</title></head><body><main>"
+                        + "<h1>Emergency access could not continue</h1><p>"
+                        + HttpUtility.HtmlEncode(failure.Message)
+                        + "</p><dl><dt>Error code</dt><dd>"
+                        + HttpUtility.HtmlEncode(code)
+                        + "</dd><dt>HTTP status</dt><dd>"
+                        + status.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        + "</dd><dt>Reference ID</dt><dd>"
+                        + HttpUtility.HtmlEncode(reference)
+                        + "</dd></dl><p>When contacting an administrator, include the reference ID, error code, "
+                        + "HTTP status, time, and action attempted. Do not include credentials or tokens.</p>"
+                        + "</main></body></html>"
+                );
+                return;
+            }
+            context.Response.ContentType = "application/json";
             context.Response.Write(
-                new Newtonsoft.Json.Linq.JObject { ["error"] = code }.ToString(Formatting.None)
+                new Newtonsoft.Json.Linq.JObject
+                {
+                    ["error"] = code,
+                    ["message"] = failure.Message,
+                    ["reference_id"] = reference,
+                }.ToString(Formatting.None)
             );
         }
     }

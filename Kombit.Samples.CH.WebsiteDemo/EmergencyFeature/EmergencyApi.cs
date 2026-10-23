@@ -173,11 +173,13 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 }
                 catch (EmergencyFailure failure)
                 {
-                    if (failure.StatusCode == 429)
-                    {
-                        context.Response.Headers["Retry-After"] = "60";
-                    }
-                    EmergencyWeb.Error(context, failure.StatusCode, failure.ErrorCode);
+                    EmergencyWeb.Error(
+                        context,
+                        failure.StatusCode,
+                        failure.ErrorCode,
+                        failure,
+                        issuerTrace.Snapshot()
+                    );
                 }
                 catch (Exception exception)
                 {
@@ -189,7 +191,9 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                     EmergencyWeb.Error(
                         context,
                         bad ? 400 : 503,
-                        bad ? "invalid_request" : "emergency_unavailable"
+                        bad ? "invalid_request" : "emergency_unavailable",
+                        exception,
+                        issuerTrace.Snapshot()
                     );
                 }
                 finally

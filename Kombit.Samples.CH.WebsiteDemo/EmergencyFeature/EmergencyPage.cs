@@ -48,7 +48,13 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
             catch (EmergencyFailure failure)
             {
                 Response.Clear();
-                EmergencyWeb.Error(Context, failure.StatusCode, failure.ErrorCode);
+                EmergencyWeb.Error(Context, failure.StatusCode, failure.ErrorCode, failure);
+                Response.End();
+            }
+            catch (Exception exception) when (!(exception is System.Threading.ThreadAbortException))
+            {
+                Response.Clear();
+                EmergencyWeb.Error(Context, 503, "emergency_unavailable", exception);
                 Response.End();
             }
         }
