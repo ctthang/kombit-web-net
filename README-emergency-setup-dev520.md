@@ -15,7 +15,7 @@ This guide records the local setup for `https://kombitspnew.safewhere.local/`. C
 | Current pool identity | `NetworkService`; pool is 64-bit |
 | SAML SP entity ID | `https://kombitspnew.safewhere.local` (no trailing slash) |
 | Identify connection GUID | `99d52401-c82f-4bb0-94eb-a864be68bd37` |
-| Normal SAML issuer | `https://dev520.safewhere.local/runtime/` (trailing slash required) |
+| Normal SAML issuer | Identify entity ID from trusted IdP metadata (the recorded local value was `https://dev520.safewhere.local/runtime/`; verify against your tenant metadata) |
 | Emergency issuer | `https://dev520.safewhere.local/runtime/emergency` |
 | Issuer API base | `https://dev520.safewhere.local/runtime/` |
 | Emergency client ID | `saml-example` |
@@ -227,3 +227,26 @@ Moved the sample's live files to `C:\ProgramData\SafewhereSamples\SamlEmergency`
 Updated the settings JSON key/state paths and both `EmergencyCredential.SettingsFile` and `EmergencyCredential.StateDirectory` in the deployed Web.config. Preserved the protected ASP.NET machine key.
 
 Deployed the updated browser script. It removes **Forget browser copy** and shows account registrations whose browser copy is missing during normal-login preparation. The existing SAML registration has not been revoked automatically: remove it using the authenticated preparation page before retrying enrollment. The normal-login capture is in memory and must be renewed after a pool restart.
+
+
+## Provision the ASP.NET machine key
+
+Run [Set-EmergencyMachineKey.ps1](Set-EmergencyMachineKey.ps1) in an elevated PowerShell session against the deployed website, outside Git. Stop the pool first and wait until it is stopped:
+
+```powershell
+Import-Module WebAdministration
+Stop-WebAppPool 'kombitspnew.safewhere.local'
+Get-WebAppPoolState 'kombitspnew.safewhere.local' # Must report Stopped before continuing.
+.\Set-EmergencyMachineKey.ps1 -WebConfigPath 'C:\inetpub\wwwroot\kombitspnew\Web.config'
+Start-WebAppPool 'kombitspnew.safewhere.local'
+```
+
+The script generates a 64-byte validation key and a 32-byte AES key using a cryptographic RNG, then writes `system.web/machineKey` with `validation="HMACSHA256"` and `decryption="AES"`. It backs up the original configuration beside Web.config using a `.config` extension and preserves its ACL. It never prints keys or puts them on the clipboard. Keep both files restricted and outside source control. Existing explicit or encrypted keys are preserved, so rerunning the script does not rotate them. `-WhatIf` previews the change. `configSource` requires separate handling of the external file. If the application inherits a stable key from server-level configuration, retain that setup instead of creating an override.
+
+Use `-ReplaceExisting` only during a coordinated reset: changing a machine key invalidates cookies and can make emergency state unreadable. For an existing working deployment, preserve its key. The script writes plaintext keys in deployed Web.config, as requested for the PoC; protect that file with IIS/filesystem permissions, or encrypt the section using the established deployment process. It does not change IIS pools itself.
+
+## SAML issuer identity and PoC settings changes
+
+Set the sample's `NormalSamlIssuer` and Identify's SAML client `NormalLoginIssuer` to the Identify tenant's **SAML entity ID**: copy `EntityDescriptor/@entityID` from trusted IdP metadata and verify that it matches the normal assertion's `Issuer`. Do not derive this value from the Runtime API URL. A tenant may use a URL or a URN as its entity ID; match it exactly. `IssuerRuntimeUrl` remains the API base URL, while `EmergencyIssuer` identifies the emergency credential issuer. The SP entity ID is a separate value.
+
+Configuration-fingerprint checks have been removed from both sample clients and Identify for this PoC. Remove `ResetPreviousConfigurationHash` from old issuer settings. No hash-approval step or automatic revocation occurs after a settings change. Protected-state integrity, protocol/token validation, state-file ownership and missing-state checks still apply. Preserve the machine/data-protection keys; existing credentials are not rewritten to match changed settings.

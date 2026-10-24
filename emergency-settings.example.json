@@ -3,7 +3,7 @@
   "RpId": "saml.example.invalid",
   "EmergencyIssuer": "https://identify.example.invalid/runtime/emergency",
   "IssuerRuntimeUrl": "https://identify.example.invalid/runtime/",
-  "NormalSamlIssuer": "https://identify.example.invalid/runtime",
+  "NormalSamlIssuer": "urn:example:identify:idp",
   "Audience": "urn:emergency:saml-example",
   "StateDirectory": "C:\\ProgramData\\SafewhereSamples\\SamlEmergency\\state",
   "PrivateEncryptionKeyFile": "C:\\ProgramData\\SafewhereSamples\\SamlEmergency\\decryption-key.bin",

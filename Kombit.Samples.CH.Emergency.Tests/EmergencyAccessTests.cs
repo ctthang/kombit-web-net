@@ -12,6 +12,41 @@ namespace Kombit.Samples.CH.Emergency.Tests
     public class EmergencyAccessTests
     {
         [TestMethod]
+        public async Task Restart_ChangedPocOrigin_PreservesRegistryWithoutHashApproval()
+        {
+            using (var fixture = new SamlFixture())
+            {
+                await fixture.Active();
+                fixture.Settings.Origin = "https://changed.fixture.invalid";
+                fixture.Settings.RpId = "changed.fixture.invalid";
+                fixture.Restart();
+                Assert.AreEqual(1, fixture.Access.Readiness(fixture.Login(), fixture.Browser)["credentials"].Count());
+            }
+        }
+
+        [TestMethod]
+        public async Task LoginVisibility_UsesLocalActiveStateOffline()
+        {
+            using (var fixture = new SamlFixture())
+            {
+                string login = fixture.Login();
+                JObject pending = await fixture.Pending(login);
+                string compact = (string)pending["emergency_credential"];
+                Assert.IsFalse(fixture.Access.IsActiveForLogin(compact));
+                await fixture.Prove(pending, false, login, 1);
+                fixture.Offline = true;
+                int calls = fixture.Calls;
+                Assert.IsTrue(fixture.Access.IsActiveForLogin(compact));
+                Assert.IsFalse(fixture.Access.IsActiveForLogin("invalid"));
+                Assert.AreEqual(calls, fixture.Calls);
+                fixture.Restart();
+                Assert.IsTrue(fixture.Access.IsActiveForLogin(compact));
+                await fixture.Access.RemoveKey(fixture.Login(), fixture.Browser, (string)pending["binding_id"], CancellationToken.None);
+                Assert.IsFalse(fixture.Access.IsActiveForLogin(compact));
+            }
+        }
+
+        [TestMethod]
         public void BackendKey_UsesConfiguredPocTextWithoutEnvironment()
         {
             Assert.AreEqual("poc-key", new Kombit.Samples.CH.Emergency.EmergencySettings { ApiKey = "poc-key" }.BackendKey());

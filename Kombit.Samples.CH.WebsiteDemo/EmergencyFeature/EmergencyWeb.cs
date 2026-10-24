@@ -304,6 +304,8 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
 
         public static void Headers(HttpContext context)
         {
+            context.Response.ContentEncoding = Encoding.UTF8;
+            context.Response.Charset = "utf-8";
             context.Response.Cache.SetCacheability(HttpCacheability.NoCache);
             context.Response.Cache.SetNoStore();
             context.Response.Headers["X-Content-Type-Options"] = "nosniff";

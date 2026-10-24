@@ -336,6 +336,20 @@ namespace Kombit.Samples.CH.Emergency
             });
         }
 
+        // Read-only local eligibility; safe to use while Identify is unavailable.
+        public bool IsActiveForLogin(string compact)
+        {
+            try
+            {
+                JObject verified = reader.Read(compact, state.Inspect(data => (string)data["trust"]), utcNow());
+                lock (state.SyncRoot)
+                {
+                    return state.Inspect(data => (string)Eligible(data, (string)verified["id"], "active")["digest"] == (string)verified["digest"]);
+                }
+            }
+            catch (EmergencyFailure) { return false; }
+        }
+
         public JObject StartProof(string browser, string compact, bool login, string normalHandle)
         {
             JObject verified = reader.Read(

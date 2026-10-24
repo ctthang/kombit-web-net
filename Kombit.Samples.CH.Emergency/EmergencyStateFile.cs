@@ -35,17 +35,6 @@ namespace Kombit.Samples.CH.Emergency
             string marker = Path.Combine(settings.StateDirectory, "initialized");
             try
             {
-                string identity = Wire.Hash(
-                    new JArray(
-                        settings.EmergencyIssuer,
-                        settings.NormalSamlIssuer,
-                        settings.Origin,
-                        settings.RpId,
-                        settings.Audience,
-                        settings.EncryptionKeyId,
-                        reader.KeyIdentity()
-                    ).ToString(Formatting.None)
-                );
                 if (File.Exists(filename))
                 {
                     if (new FileInfo(filename).Length > 16777216)
@@ -61,7 +50,6 @@ namespace Kombit.Samples.CH.Emergency
                     );
                     if (
                         (int?)current["version"] != 1
-                        || (string)current["identity"] != identity
                         || !(current["keys"] is JObject)
                         || !(current["credentials"] is JObject)
                         || !(current["sessions"] is JObject)
@@ -69,6 +57,7 @@ namespace Kombit.Samples.CH.Emergency
                     {
                         throw new InvalidOperationException();
                     }
+                    current.Remove("identity");
                     CredentialReader.CheckTrust((string)current["trust"]);
                 }
                 else
@@ -86,7 +75,6 @@ namespace Kombit.Samples.CH.Emergency
                     current = new JObject
                     {
                         ["version"] = 1,
-                        ["identity"] = identity,
                         ["trust"] = trust,
                         ["cursor"] = 0L,
                         ["keys"] = new JObject(),

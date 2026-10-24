@@ -68,7 +68,7 @@
             if (!header)
                 callHistory.push(
                     stamp +
-                        ' — No issuer diagnostics received (older server or request rejected before the handler).',
+                        ' \u2014 No issuer diagnostics received (older server or request rejected before the handler).',
                 );
             else {
                 const calls = JSON.parse(atob(header));
@@ -76,7 +76,7 @@
                 if (!calls.length)
                     callHistory.push(
                         stamp +
-                            ' — Local request: HTTP ' +
+                            ' \u2014 Local request: HTTP ' +
                             response.status +
                             '; no Identify endpoint called.',
                     );
@@ -84,15 +84,15 @@
                     callHistory.push(
                         (
                             stamp +
-                            ' — ' +
+                            ' \u2014 ' +
                             call.method +
                             ' ' +
                             call.endpoint +
-                            ' — ' +
+                            ' \u2014 ' +
                             (call.status == null ? 'no HTTP status' : 'HTTP ' + call.status) +
-                            ' — ' +
+                            ' \u2014 ' +
                             call.milliseconds +
-                            ' ms — ' +
+                            ' ms \u2014 ' +
                             call.summary
                         ).slice(0, 600),
                     );
@@ -162,7 +162,7 @@
         return async function (event) {
             if (event) event.preventDefault();
             try {
-                show('Working…', 'busy');
+                show('Working\u2026', 'busy');
                 const status = document.getElementById('status');
                 await operation();
                 if (status.dataset.tone === 'busy') show('');
@@ -343,11 +343,12 @@
             const current = state && state.credentials.find(item => item.ec_id === entry.ec_id);
             if (state && !current) continue;
             const expired = entry.expires_at * 1000 <= Date.now();
-            const status = current ? current.status : expired ? 'expired' : 'stored';
+            if (page.dataset.mode === 'login' && (expired || (await send('login-status', { emergency_credential: entry.emergency_credential })).active !== true)) continue;
+            const status = current ? current.status : 'active';
             const row = element('li', 'key');
             const head = element('div', 'key-head');
             head.append(
-                element('span', 'key-name', 'Key …' + entry.binding_id.slice(-6)),
+                element('span', 'key-name', 'Key \u2026' + entry.binding_id.slice(-6)),
                 element(
                     'span',
                     'badge ' + status,
@@ -363,7 +364,7 @@
                     'key-meta',
                     (expired ? 'Expired ' : 'Expires ') +
                         new Date(entry.expires_at * 1000).toLocaleString() +
-                        (state || expired ? '' : ' · checked by the server on use'),
+                        (state || expired ? '' : ' \u00b7 checked by the server on use'),
                 ),
             );
             const actions = element('div', 'actions');
@@ -387,7 +388,7 @@
                     control(
                         'Remove key locally',
                         async () => {
-                            if (!confirm('Remove key …' + entry.binding_id.slice(-6) + '?')) return;
+                            if (!confirm('Remove key \u2026' + entry.binding_id.slice(-6) + '?')) return;
                             await send('remove', { binding_id: entry.binding_id });
                             await deleteStoredBinding(entry.binding_id);
                             show(
@@ -414,10 +415,10 @@
             }
             for (const entry of missing.values()) {
                 const row = element('li', 'key');
-                row.append(element('span', 'key-name', 'Key …' + entry.binding_id.slice(-6)),
+                row.append(element('span', 'key-name', 'Key \u2026' + entry.binding_id.slice(-6)),
                     element('p', 'key-meta', 'Browser copy missing. Remove this registration before preparing the same authenticator again. This also ends its emergency sessions in other browsers.'));
                 row.append(control('Remove key locally', async () => {
-                    if (!confirm('Remove registration for key …' + entry.binding_id.slice(-6) + ' and end its emergency sessions?')) return;
+                    if (!confirm('Remove registration for key \u2026' + entry.binding_id.slice(-6) + ' and end its emergency sessions?')) return;
                     await send('remove', { binding_id: entry.binding_id });
                     await deleteStoredBinding(entry.binding_id);
                     show('Registration removed locally. If Identify is unavailable, its revocation is queued; wait for it to synchronize before preparing this key again.', 'success');
@@ -431,7 +432,7 @@
                 element(
                     'li',
                     'empty',
-                    'This browser has no matching prepared credential. Use normal login to prepare.',
+                    page.dataset.mode === 'login' ? 'This browser has no active emergency key. Use normal login to prepare or confirm a key.' : 'This browser has no matching prepared credential. Use normal login to prepare.',
                 ),
             );
     }

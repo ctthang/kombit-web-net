@@ -122,6 +122,10 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                                 EmergencyWeb.NormalHandle(context)
                             );
                             break;
+                        case "login-status":
+                            Wire.Fields(body, "emergency_credential");
+                            result = new JObject { ["active"] = access.IsActiveForLogin(Wire.String(body, "emergency_credential", 65536)) };
+                            break;
                         case "login-options":
                             Wire.Fields(body, "emergency_credential");
                             result = access.StartProof(

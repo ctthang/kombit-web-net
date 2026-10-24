@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <title>Emergency access — SAML sample</title>
+    <title>Emergency access &#8212; SAML sample</title>
     <link rel="stylesheet" href="<%= ResolveUrl("~/EmergencyAssets/emergency.css") %>" />
 </head>
 <body>
@@ -51,7 +51,7 @@
     <section class="card">
         <h2>Keys stored in this browser</h2>
         <p id="storage-note" class="hint">Clearing or evicting site data loses preparation. A different browser profile is not prepared.</p>
-        <ul id="saved-keys" class="key-list"><li class="empty">Loading stored keys…</li></ul>
+        <ul id="saved-keys" class="key-list"><li class="empty">Loading stored keys&#8230;</li></ul>
         <p class="hint">If issuance succeeded but storage or delivery failed, its binding can still count towards the issuer's key limit. Ask an Identify administrator to remove the binding before trying again.</p>
     </section>
 
@@ -59,7 +59,7 @@
     <section class="card">
         <h2>Local emergency login</h2>
         <p class="lead">Select a locally stored credential. This page and the key check do not contact Identify.</p>
-        <ul id="saved-keys" class="key-list"><li class="empty">Loading stored keys…</li></ul>
+        <ul id="saved-keys" class="key-list"><li class="empty">Loading stored keys&#8230;</li></ul>
     </section>
 
 <% } else if (view.Mode == "home") { %>

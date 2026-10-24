@@ -141,3 +141,33 @@ SAML uses a flat JSON object. Set `EmergencyCredential.SettingsFile` in deployed
 To migrate an existing installation, stop the client pool, back up its settings and protected state, and move the existing files rather than generating new keys. Update every absolute path in the settings and the deployed configuration, then restart the pool. Preserve directory ACLs and the existing machine/data-protection keys. Do not reset state, change the emergency audience, or run the key-generation script over the existing installation. Keep old files only in `backups`, not as a second live configuration. No Identify redeployment or issuer configuration change is needed for this directory move.
 
 Regression check: prepare a key, simulate losing its browser storage, then perform a fresh normal login. The preparation page must show one **Browser copy missing** row per binding, including when it has several renewed versions. **Remove key locally** must report revocation to Identify and remove the row. Only then enroll the same authenticator again. A failed removal request must leave browser data untouched. The emergency-login page must never offer browser-only deletion.
+
+
+### Active keys on emergency login
+
+The emergency-login screen displays only browser-stored keys that the client registry currently accepts as active and unexpired. Pending, replaced, blocked, removed, expired, and invalid credentials are hidden. The page checks each stored credential through a read-only local status endpoint; it does not contact Identify, require normal login, or create a WebAuthn challenge. Preparation still shows management and pending-confirmation controls. Login rechecks eligibility when the key is used. Revocations unknown to the offline client cannot be detected until synchronization.
+
+Deploy the updated client assemblies and browser script together: the script now requires the local login-status endpoint. No Identify redeployment or settings change is needed. Hard-refresh the emergency-login page after deployment.
+
+
+## Provision the ASP.NET machine key
+
+Run [Set-EmergencyMachineKey.ps1](Set-EmergencyMachineKey.ps1) in an elevated PowerShell session against the deployed website, outside Git. Stop the pool first and wait until it is stopped:
+
+```powershell
+Import-Module WebAdministration
+Stop-WebAppPool 'kombitspnew.safewhere.local'
+Get-WebAppPoolState 'kombitspnew.safewhere.local' # Must report Stopped before continuing.
+.\Set-EmergencyMachineKey.ps1 -WebConfigPath 'C:\inetpub\wwwroot\kombitspnew\Web.config'
+Start-WebAppPool 'kombitspnew.safewhere.local'
+```
+
+The script generates a 64-byte validation key and a 32-byte AES key using a cryptographic RNG, then writes `system.web/machineKey` with `validation="HMACSHA256"` and `decryption="AES"`. It backs up the original configuration beside Web.config using a `.config` extension and preserves its ACL. It never prints keys or puts them on the clipboard. Keep both files restricted and outside source control. Existing explicit or encrypted keys are preserved, so rerunning the script does not rotate them. `-WhatIf` previews the change. `configSource` requires separate handling of the external file. If the application inherits a stable key from server-level configuration, retain that setup instead of creating an override.
+
+Use `-ReplaceExisting` only during a coordinated reset: changing a machine key invalidates cookies and can make emergency state unreadable. For an existing working deployment, preserve its key. The script writes plaintext keys in deployed Web.config, as requested for the PoC; protect that file with IIS/filesystem permissions, or encrypt the section using the established deployment process. It does not change IIS pools itself.
+
+## SAML issuer identity and PoC settings changes
+
+Set the sample's `NormalSamlIssuer` and Identify's SAML client `NormalLoginIssuer` to the Identify tenant's **SAML entity ID**: copy `EntityDescriptor/@entityID` from trusted IdP metadata and verify that it matches the normal assertion's `Issuer`. Do not derive this value from the Runtime API URL. A tenant may use a URL or a URN as its entity ID; match it exactly. `IssuerRuntimeUrl` remains the API base URL, while `EmergencyIssuer` identifies the emergency credential issuer. The SP entity ID is a separate value.
+
+Configuration-fingerprint checks have been removed from both sample clients and Identify for this PoC. Remove `ResetPreviousConfigurationHash` from old issuer settings. No hash-approval step or automatic revocation occurs after a settings change. Protected-state integrity, protocol/token validation, state-file ownership and missing-state checks still apply. Preserve the machine/data-protection keys; existing credentials are not rewritten to match changed settings.
