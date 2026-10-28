@@ -86,6 +86,17 @@
             <span class="title"><b>My page:</b></span>
         </div>
         <b>WELCOME, <%= Saml20Identity.Current.Name %></b>
+        <% if (EmergencyAvailable)
+            { %>
+        <section id="emergency-setup" class="login-card login-card-alt emergency-setup" aria-labelledby="emergency-setup-title"
+            data-api="<%: ResolveUrl("~/EmergencyApi.ashx") %>" data-csrf="<%: EmergencyCsrf %>"
+            data-manage="<%: ResolveUrl("~/Emergency.aspx") %>" data-login="<%: ResolveUrl("~/login.ashx") + "?ReturnUrl=" + HttpUtility.UrlEncode(ResolveUrl("~/MyPage.aspx")) %>">
+            <h2 id="emergency-setup-title" class="login-card-title">Emergency access</h2>
+            <p id="emergency-setup-text" class="login-card-text">Checking emergency access for this browser...</p>
+            <div id="emergency-setup-actions" class="emergency-setup-actions"></div>
+            <p id="emergency-setup-status" class="login-alt-status" role="status" aria-live="polite" hidden="hidden"></p>
+        </section>
+        <% } %>
         <table>
             <thead>
                 <tr>
@@ -112,10 +123,6 @@
 
         <div>
             <asp:Button CssClass="btn btn-info" ID="btnLogoff" runat="server" Enabled="true" Text="Logoff" OnClick="Btn_Logoff_Click" />
-            <% if (Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyWeb.Enabled)
-                { %>
-            <a href="<%= ResolveUrl("~/Emergency.aspx") %>" class="btn btn-default">Prepare emergency access</a>
-            <% } %>
         </div>
 
         <hr style="border-top: dotted; border-width: 1px;" />
@@ -147,5 +154,9 @@
             <% } %>
         </div>
     </div>
+    <% } %>
+    <% if (EmergencyAvailable)
+        { %>
+    <script type="text/javascript" src="<%: ((Kombit.Samples.CH.WebsiteDemo.sp)Master).AssetUrl("~/EmergencyAssets/setup.js") %>"></script>
     <% } %>
 </asp:Content>

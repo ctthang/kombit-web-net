@@ -57,9 +57,38 @@ namespace Kombit.Samples.CH.WebsiteDemo
             MessageId = "System.Web.UI.Page.set_Title(System.String)",
             Justification = "This is a demo project and thus localization is not necessary."
         )]
+        /// <summary>True when the emergency access card may be shown on this page.</summary>
+        protected bool EmergencyAvailable { get; private set; }
+
+        protected string EmergencyCsrf { get; private set; }
+
+        private void OfferEmergencySetup()
+        {
+            if (!EmergencyFeature.EmergencyWeb.Enabled || !Saml20Identity.IsInitialized())
+            {
+                return;
+            }
+            try
+            {
+                EmergencyFeature.EmergencyWeb.CheckTransport(Context);
+                EmergencyCsrf = EmergencyFeature.EmergencyWeb.Csrf(Context);
+                EmergencyAvailable = true;
+            }
+            catch (Kombit.Samples.CH.Emergency.EmergencyFailure)
+            {
+                // Wrong host or support unavailable: the card is not shown.
+            }
+            catch (Exception exception)
+                when (!(exception is System.Threading.ThreadAbortException))
+            {
+                EmergencyFeature.EmergencyDiagnostics.Log(Context, 503, "setup_card_unavailable", exception);
+            }
+        }
+
         protected void Page_Load(object sender, EventArgs e)
         {
             Title = "My page on SP " + SAML20FederationConfig.GetConfig().ServiceProvider.ID;
+            OfferEmergencySetup();
 
             if (Request.QueryString["action"] == "sso")
             {

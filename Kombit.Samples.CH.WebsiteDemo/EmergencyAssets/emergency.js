@@ -118,18 +118,7 @@
     renderIssuerCalls();
 
 
-    function setPreparationState(canPrepare) {
-        const login = document.getElementById('normal-login-step');
-        const prepare = document.getElementById('prepare-step');
-        const button = document.getElementById('register');
-        if (!login || !prepare || !button) return;
-        login.hidden = canPrepare;
-        prepare.hidden = !canPrepare;
-        button.disabled = !canPrepare;
-    }
-
     async function send(operation, values) {
-        if (operation === "enroll" || operation === "renew") setPreparationState(false);
         const response = await fetch(page.dataset.api + '?op=' + encodeURIComponent(operation), {
             method: 'POST',
             credentials: 'same-origin',
@@ -180,18 +169,6 @@
         const element = document.getElementById(id);
         if (element) element.addEventListener('click', action(operation));
     }
-    function bytes(value) {
-        const base64 =
-            value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (value.length % 4)) % 4);
-        return Uint8Array.from(atob(base64), character => character.charCodeAt(0));
-    }
-    function text(value) {
-        return btoa(String.fromCharCode(...new Uint8Array(value)))
-            .replace(/=/g, '')
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_');
-    }
-
     async function deleteStoredBinding(bindingId) {
         const db = await new Promise((resolve, reject) => {
             const request = indexedDB.open('saml-emergency-credentials-v1', 1);
@@ -239,81 +216,13 @@
             database.close();
         }
     }
-    async function prove(entry) {
-        const pending = await send('activate-options', {
-            emergency_credential: entry.emergency_credential,
-        });
-        const options = pending.publicKey;
-        options.challenge = bytes(options.challenge);
-        options.allowCredentials.forEach(key => (key.id = bytes(key.id)));
-        const key = await navigator.credentials.get({ publicKey: options });
-        const response = key.response;
-        await send('activate-complete', {
-            transaction_id: pending.transaction_id,
-            credential: {
-                id: key.id,
-                rawId: text(key.rawId),
-                type: key.type,
-                clientExtensionResults: key.getClientExtensionResults(),
-                response: {
-                    clientDataJSON: text(response.clientDataJSON),
-                    authenticatorData: text(response.authenticatorData),
-                    signature: text(response.signature),
-                    userHandle: response.userHandle ? text(response.userHandle) : null,
-                },
-            },
-        });
-        show('Ready. This browser and key can now be used for emergency login from the sign-in page.', 'success');
+    // Setup and renewal run on My Page. Here a stored pending credential can be finished
+    // without a second key check: the server activates it after browser read-back.
+    async function activateStored(entry) {
+        await send('activate-stored', { emergency_credential: entry.emergency_credential });
+        show('Ready. This browser can use emergency login from the sign-in page.', 'success');
         await displayKeys();
     }
-    async function keep(entry) {
-        const persistent =
-            navigator.storage && navigator.storage.persist
-                ? await navigator.storage.persist()
-                : false;
-        document.getElementById('storage-note').textContent = persistent
-            ? 'Persistent storage granted. Clearing site data still removes preparation.'
-            : 'Persistent storage was not granted. Cleanup or eviction can remove preparation.';
-        await storage(entry);
-        const saved = (await storage()).find(item => item.ec_id === entry.ec_id);
-        if (!saved || saved.emergency_credential !== entry.emergency_credential)
-            throw new Error('Storage read-back failed. The credential is not ready.');
-        show('Stored, pending activation. Check your key again.', 'busy');
-        await prove(saved);
-    }
-    connect('register', async () => {
-        let pending;
-        try {
-            pending = await send('enroll');
-            const options = pending.publicKey;
-            options.challenge = bytes(options.challenge);
-            options.user.id = bytes(options.user.id);
-            (options.excludeCredentials || []).forEach(key => (key.id = bytes(key.id)));
-            const key = await navigator.credentials.create({ publicKey: options });
-            const entry = await send('enroll-complete', {
-                id: pending.enrollment_id,
-                credential: {
-                    id: key.id,
-                    rawId: text(key.rawId),
-                    type: key.type,
-                    clientExtensionResults: key.getClientExtensionResults(),
-                    response: {
-                        clientDataJSON: text(key.response.clientDataJSON),
-                        attestationObject: text(key.response.attestationObject),
-                        transports: key.response.getTransports ? key.response.getTransports() : [],
-                    },
-                },
-            });
-            pending = null;
-            await keep(entry);
-        } finally {
-            if (pending) {
-                try {
-                    await send('enroll-cancel', { id: pending.enrollment_id });
-                } catch (_) {}
-            }
-        }
-    });
     function control(label, work, variant) {
         const button = element('button', variant || 'secondary', label);
         button.type = 'button';
@@ -321,7 +230,7 @@
         return button;
     }
     const statusLabels = {
-        pending: 'Pending check',
+        pending: 'Setup unfinished',
         active: 'Active',
         replaced: 'Replaced',
         blocked: 'Blocked',
@@ -332,7 +241,6 @@
         if (!list) return;
         const saved = await storage();
         const state = page.dataset.mode === 'prepare' ? await send('status') : null;
-        if (state) setPreparationState(state.can_prepare === true);
         list.replaceChildren();
         for (const entry of saved) {
             const current = state && state.credentials.find(item => item.ec_id === entry.ec_id);
@@ -365,13 +273,7 @@
             if (state) {
                 if (current.status === 'pending')
                     actions.append(
-                        control('Confirm stored credential', () => prove(entry), 'primary'),
-                    );
-                if (current.status === 'active' && state.can_prepare)
-                    actions.append(
-                        control('Renew', async () =>
-                            keep(await send('renew', { binding_id: entry.binding_id })),
-                        ),
+                        control('Finish setup', () => activateStored(entry), 'primary'),
                     );
                 actions.append(
                     control(

@@ -363,6 +363,7 @@
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
     <Compile Include="SignonHandler.cs" />
+    <Compile Include="AssetVersion.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="metadata.ashx" />
@@ -446,6 +447,7 @@ xcopy /E /I /D /Q /Y "$(ProjectDir)EmergencyAssets" "$(SolutionDir)Deployment\Ko
     <Content Include="EmergencyAssets\emergency.css" />
     <Content Include="EmergencyAssets\emergency.js" />
     <Content Include="EmergencyAssets\login-options.js" />
+    <Content Include="EmergencyAssets\setup.js" />
     <Content Include="EmergencyEnded.aspx" />
     <Compile Include="EmergencyFeature\EmergencyApi.cs" />
     <Compile Include="EmergencyFeature\EmergencyDiagnostics.cs" />

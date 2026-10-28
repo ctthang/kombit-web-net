@@ -127,8 +127,7 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 case "enroll-cancel":
                 case "renew":
                 case "status":
-                case "activate-options":
-                case "activate-complete":
+                case "activate-stored":
                 case "login-status":
                 case "login-options":
                 case "login-complete":

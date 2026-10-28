@@ -11,7 +11,6 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
     {
         public string Mode { get; private set; }
         public string CsrfToken { get; private set; }
-        public bool CanPrepare { get; private set; }
         public ClaimsPrincipal EmergencyUser
         {
             get { return Context.User as ClaimsPrincipal; }
@@ -30,17 +29,6 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                     file.Equals("Emergency.aspx", StringComparison.OrdinalIgnoreCase) ? "prepare"
                     : file.Equals("EmergencyHome.aspx", StringComparison.OrdinalIgnoreCase) ? "home"
                     : "ended";
-                if (Mode == "prepare")
-                {
-                    try
-                    {
-                        CanPrepare = EmergencyWeb.Service.CanPrepare(EmergencyWeb.NormalHandle(Context), EmergencyWeb.Browser(Context, false));
-                    }
-                    catch (EmergencyFailure failure) when (failure.StatusCode == 401 || failure.ErrorCode == "new_normal_login_required")
-                    {
-                        CanPrepare = false;
-                    }
-                }
                 if (Mode == "home" && !EmergencyWeb.IsEmergency(Context))
                 {
                     Response.Redirect(ResolveUrl("~/EmergencyEnded.aspx"), true);

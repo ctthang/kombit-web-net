@@ -356,3 +356,16 @@ a.idp-option:focus {
 .div-row-btn-mypage .btn + .btn {
     margin-left: 8px;
 }
+
+/* Emergency access card (My Page) */
+.emergency-setup {
+    margin: 14px 0 18px 0;
+}
+
+.emergency-setup .login-card-text {
+    margin-bottom: 14px;
+}
+
+.emergency-setup-actions .btn + .btn {
+    margin-left: 8px;
+}

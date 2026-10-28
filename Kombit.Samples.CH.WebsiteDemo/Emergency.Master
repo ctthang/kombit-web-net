@@ -9,7 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <title>Emergency access &#8212; SAML sample</title>
-    <link rel="stylesheet" href="<%= ResolveUrl("~/EmergencyAssets/emergency.css") %>" />
+    <link rel="stylesheet" href="<%= Kombit.Samples.CH.WebsiteDemo.AssetVersion.Url("~/EmergencyAssets/emergency.css") %>" />
 </head>
 <body>
 <% EmergencyPage view = (EmergencyPage)Page; %>
@@ -18,7 +18,7 @@
         <a class="brand" href="<%= ResolveUrl("~/Default.aspx") %>"><span class="brand-mark" aria-hidden="true">!</span>SAML sample</a>
         <nav aria-label="Emergency access">
             <a href="<%= ResolveUrl("~/Default.aspx") %>">Normal application</a>
-            <a href="<%= ResolveUrl("~/Emergency.aspx") %>" <% if (view.Mode == "prepare") { %>aria-current="page"<% } %>>Prepare</a>
+            <a href="<%= ResolveUrl("~/Emergency.aspx") %>" <% if (view.Mode == "prepare") { %>aria-current="page"<% } %>>Manage keys</a>
         </nav>
     </div>
 </header>
@@ -32,20 +32,11 @@
 
 <% if (view.Mode == "prepare") { %>
     <section class="card">
-        <h2>Prepare this browser</h2>
-        <p class="lead">Use a security key or passkey. User presence is required; user verification is preferred. Preparation has three parts: registration, browser storage, and a separate key check.</p>
-        <ol class="steps">
-            <li id="normal-login-step" <% if (view.CanPrepare) { %>hidden<% } %>>
-                <span class="step-title">Start from a recent normal login</span>
-                <span class="hint">Preparation and renewal require a fresh normal login.</span>
-                <a class="button secondary" href="<%= ResolveUrl("~/login.ashx?ReturnUrl=Emergency.aspx") %>">Get a new normal login for preparation or renewal</a>
-            </li>
-            <li id="prepare-step" <% if (!view.CanPrepare) { %>hidden<% } %>>
-                <span class="step-title">Register and store a key</span>
-                <span class="hint"><% if (view.CanPrepare) { %>Your browser will ask for the key twice: once to register it, once to confirm it.<% } else { %>Not available yet. Get a new normal login first.<% } %></span>
-                <button id="register" class="primary" type="button" <% if (!view.CanPrepare) { %>disabled<% } %>>Prepare this browser</button>
-            </li>
-        </ol>
+        <h2>Emergency keys</h2>
+        <p class="lead">Set up and renew emergency access on My Page after a normal login: it takes one security key or passkey prompt, and renewal is automatic. Use this page to review or remove keys registered for your account.</p>
+        <div class="actions">
+            <a class="button secondary" href="<%= ResolveUrl("~/MyPage.aspx") %>#emergency-setup">Go to My Page</a>
+        </div>
     </section>
     <section class="card">
         <h2>Keys stored in this browser</h2>
@@ -93,6 +84,6 @@
         <ol id="issuer-call-results" class="log"></ol>
     </details>
 </main>
-<script src="<%= ResolveUrl("~/EmergencyAssets/emergency.js") %>" defer></script>
+<script src="<%= Kombit.Samples.CH.WebsiteDemo.AssetVersion.Url("~/EmergencyAssets/emergency.js") %>" defer></script>
 </body>
 </html>

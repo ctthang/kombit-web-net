@@ -103,22 +103,11 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                             await access.SynchronizeIfDue(cancellation);
                             result = access.Readiness(handle, browser);
                             break;
-                        case "activate-options":
+                        case "activate-stored":
                             Wire.Fields(body, "emergency_credential");
-                            result = access.StartProof(
+                            result = access.ActivateStored(
                                 browser,
                                 Wire.String(body, "emergency_credential", 65536),
-                                false,
-                                EmergencyWeb.NormalHandle(context)
-                            );
-                            break;
-                        case "activate-complete":
-                            Wire.Fields(body, "transaction_id", "credential");
-                            result = await access.CompleteProof(
-                                browser,
-                                Wire.String(body, "transaction_id", 128),
-                                false,
-                                (JObject)body["credential"],
                                 EmergencyWeb.NormalHandle(context)
                             );
                             break;

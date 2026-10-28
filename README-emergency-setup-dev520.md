@@ -135,9 +135,9 @@ Stop/start `Identify dev520` once to load the new issuer client configuration (o
 ## 6. Test preparation and emergency access
 
 1. Obtain a **fresh normal login through dev520** after restarting Identify. A previous SAML session alone does not supply a fresh preparation record.
-2. In the same browser/profile, open `https://kombitspnew.safewhere.local/Emergency.aspx` and choose **Prepare this browser**. For an existing active credential, use renewal after a fresh normal login instead of generating another key.
-3. Complete authenticator registration, browser storage/read-back, and the separate possession check. Wait for **Ready**. The `poc-up` policy requires user presence, prefers user verification, and allows backed-up passkeys.
-4. Expand **Identify endpoint results (PoC)** and confirm the enrollment/completion or renewal responses. A successful response alone is not readiness.
+2. On My Page, choose **Set up emergency access** in the **Emergency access** card. An existing active credential is renewed automatically after normal login once half its lifetime has passed; do not register another key for it.
+3. Complete the single authenticator registration prompt. The card then reports that emergency access is ready and shows its expiry date. The `poc-up` policy requires user presence, prefers user verification, and allows backed-up passkeys.
+4. Optionally open **Manage keys** and expand **Identify endpoint results (PoC)** to review the issuer calls made while that page loaded key status.
 5. Sign out, open `https://kombitspnew.safewhere.local/login.ashx`, choose **Emergency login** in the **Other login options** card, and complete the key check.
 6. On `EmergencyHome.aspx`, verify identity/organisation claims and the BPP privilege from the normal assertion. Normal assurance claims remain historical snapshot data; local emergency controls determine the session.
 7. Use **Sign out locally**. Normal federation logout and STS/service-token actions are unavailable during emergency access.

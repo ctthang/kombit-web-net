@@ -350,6 +350,58 @@ namespace Kombit.Samples.CH.Emergency
             catch (EmergencyFailure) { return false; }
         }
 
+        /// <summary>
+        ///     Activates a pending credential once the browser has stored it and read it back, without
+        ///     a second WebAuthn ceremony. The caller must hold the normal login of the same account in
+        ///     the same browser; possession of the authenticator is proven at emergency login.
+        /// </summary>
+        public JObject ActivateStored(string browser, string compact, string normalHandle)
+        {
+            JObject verified = reader.Read(
+                compact,
+                state.Inspect(data => (string)data["trust"]),
+                utcNow()
+            );
+            lock (state.SyncRoot)
+            {
+                AcceptedSamlLogin login = Login(normalHandle, browser, false);
+                return state.Change(data =>
+                {
+                    JObject entry = Eligible(data, (string)verified["id"], "pending");
+                    if ((string)entry["digest"] != (string)verified["digest"])
+                    {
+                        throw new EmergencyFailure(403, "credential_not_registered");
+                    }
+                    if ((string)entry["account"] != login.AccountKey)
+                    {
+                        throw new EmergencyFailure(403, "account_mismatch");
+                    }
+                    JObject key = (JObject)data["keys"][(string)entry["binding"]];
+                    if ((long)entry["issued"] <= (long)key["active_issued"])
+                    {
+                        throw new EmergencyFailure(409, "replacement_superseded");
+                    }
+                    foreach (
+                        JObject old in ((JObject)data["credentials"])
+                            .Properties()
+                            .Select(item => (JObject)item.Value)
+                            .Where(item =>
+                                (string)item["binding"] == (string)entry["binding"]
+                                && (string)item["status"] == "active"
+                            )
+                    )
+                    {
+                        old["status"] = "replaced";
+                    }
+                    entry["status"] = "active";
+                    key["active_issued"] = entry["issued"];
+                    key["revision"] = (long)key["revision"] + 1;
+                    Event(data, "credential_activated");
+                    return new JObject { ["ready"] = true };
+                });
+            }
+        }
+
         public JObject StartProof(string browser, string compact, bool login, string normalHandle)
         {
             JObject verified = reader.Read(
@@ -631,6 +683,9 @@ namespace Kombit.Samples.CH.Emergency
                                     : (long)item["expires"] <= Now ? "expired"
                                     : (string)item["status"],
                                 ["renew_soon"] = (long)item["expires"] < Now + 259200,
+                                // Half the credential lifetime has passed: renew silently after a normal login.
+                                ["renew_due"] =
+                                    2 * Now >= (long)item["issued"] + (long)item["expires"],
                             })
                     ),
                 });

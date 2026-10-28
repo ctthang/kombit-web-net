@@ -10,7 +10,7 @@
                 <a href="MyPage.aspx" class="btn btn-info">Go to My Page</a>
                 <% if (Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyWeb.Enabled)
                    { %>
-                <a href="<%= ResolveUrl("~/Emergency.aspx") %>" class="btn btn-default">Prepare emergency access</a>
+                <a href="<%= ResolveUrl("~/MyPage.aspx") + "#emergency-setup" %>" class="btn btn-default">Prepare emergency access</a>
                 <% } %>
                 <% }
                    else
