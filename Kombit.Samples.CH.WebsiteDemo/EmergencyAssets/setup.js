@@ -177,7 +177,22 @@
                 requireResidentKey: false,
             });
             applyAuthenticator(options, 'create');
-            const key = await navigator.credentials.create({ publicKey: options });
+            const started = Date.now();
+            let key;
+            try {
+                key = await navigator.credentials.create({ publicKey: options });
+            } catch (error) {
+                // Keep what the browser was asked for, so an instant refusal can be explained.
+                error.webauthnMs = Date.now() - started;
+                console.warn('Emergency setup: the browser rejected the registration request.', {
+                    name: error.name,
+                    message: error.message,
+                    afterMs: error.webauthnMs,
+                    hints: options.hints || null,
+                    authenticatorSelection: options.authenticatorSelection,
+                });
+                throw error;
+            }
             const transports = key.response.getTransports ? key.response.getTransports() : [];
             const entry = await send('enroll-complete', {
                 id: pending.enrollment_id,
@@ -221,8 +236,12 @@
             } catch (error) {
                 element.disabled = false;
                 show(
-                    error.name === 'NotAllowedError'
-                        ? 'Setup was cancelled. Try again when your key is ready.'
+                    error.name === 'NotAllowedError' && error.webauthnMs < 1500
+                        ? 'The browser refused to register a key without showing a prompt (' +
+                          error.name + ': ' + error.message + '). Check that this browser can use ' +
+                          'your passkey or security key, then try again.'
+                        : error.name === 'NotAllowedError'
+                        ? 'Setup was cancelled or timed out. Try again when your key is ready.'
                         : error.name === 'InvalidStateError'
                         ? 'This key is already registered. Remove it under Manage keys first.'
                         : error.message || 'Emergency access setup failed.',

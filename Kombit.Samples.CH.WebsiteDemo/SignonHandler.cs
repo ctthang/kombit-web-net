@@ -4,6 +4,7 @@ using System;
 using System.Web;
 using dk.nita.saml20.config;
 using dk.nita.saml20.protocol;
+using dk.nita.saml20.Session;
 
 #endregion
 
@@ -35,12 +36,33 @@ namespace Kombit.Samples.CH.WebsiteDemo
             }
             if (NeedsLoginOptions(context))
             {
+                // The framework's own chooser is shown after it has created the user's SAML
+                // session; do the same, so the IdP links on the login options page find one.
+                SessionStore.CreateSessionIfNotExists();
                 context.Response.Cache.SetCacheability(HttpCacheability.NoCache);
                 context.Response.Cache.SetNoStore();
                 context.Server.Execute(LoginOptionsPage, true);
                 return;
             }
+            if (IsOutgoingSignIn(context.Request))
+            {
+                // The base handler writes forceAuthn/isPassive/loa options into the session before
+                // it creates the session, which fails for a browser that has none yet (for example a
+                // direct login.ashx?cidp=... link). Create it first, as the framework does later anyway.
+                SessionStore.CreateSessionIfNotExists();
+            }
             base.Handle(context);
+        }
+
+        /// <summary>
+        ///     True for a request that starts a sign-in: no SAML artifact, response, or SOAP message.
+        ///     Incoming protocol messages keep the framework's own session checks.
+        /// </summary>
+        private static bool IsOutgoingSignIn(HttpRequest request)
+        {
+            return string.IsNullOrEmpty(request.Params["SAMLart"])
+                && string.IsNullOrEmpty(request.Params["SAMLResponse"])
+                && request.Headers["SOAPAction"] == null;
         }
 
         /// <summary>

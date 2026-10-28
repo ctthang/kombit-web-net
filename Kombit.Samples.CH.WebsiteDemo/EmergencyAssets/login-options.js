@@ -156,7 +156,22 @@
         if (Array.isArray(entry.transports) && entry.transports.length)
             options.allowCredentials.forEach(key => (key.transports = entry.transports.slice()));
         applyAuthenticator(options, 'get');
-        const key = await navigator.credentials.get({ publicKey: options });
+        const started = Date.now();
+        let key;
+        try {
+            key = await navigator.credentials.get({ publicKey: options });
+        } catch (error) {
+            // Keep what the browser was asked for, so an instant refusal can be explained.
+            error.webauthnMs = Date.now() - started;
+            console.warn('Emergency login: the browser rejected the key check.', {
+                name: error.name,
+                message: error.message,
+                afterMs: error.webauthnMs,
+                hints: options.hints || null,
+                transports: options.allowCredentials.map(item => item.transports || null),
+            });
+            throw error;
+        }
         const response = key.response;
         const result = await send('login-complete', {
             transaction_id: pending.transaction_id,
@@ -189,8 +204,12 @@
                 await login(entry);
             } catch (error) {
                 show(
-                    error.name === 'NotAllowedError'
-                        ? 'Key check cancelled. Try again when your key is ready.'
+                    error.name === 'NotAllowedError' && error.webauthnMs < 1500
+                        ? 'The browser refused the key check without showing a prompt (' +
+                          error.name + ': ' + error.message + '). Use the browser where this ' +
+                          'key was set up, or check that it can use your passkey or security key.'
+                        : error.name === 'NotAllowedError'
+                        ? 'Key check cancelled or timed out. Try again when your key is ready.'
                         : error.message || 'Emergency login failed.',
                     'error',
                 );
