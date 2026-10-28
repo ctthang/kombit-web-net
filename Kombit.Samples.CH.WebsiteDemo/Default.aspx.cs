@@ -4,6 +4,7 @@ using System;
 using System.Configuration;
 using System.Web.UI;
 using dk.nita.saml20.config;
+using dk.nita.saml20.identity;
 
 #endregion
 
@@ -20,6 +21,20 @@ namespace Kombit.Samples.CH.WebsiteDemo
         ///     Indicates whether the certificate is incorrectly configured in web.config.
         /// </summary>
         protected bool certificateMissing;
+
+        /// <summary>
+        ///     True when the visitor has a normal SAML login session (not an emergency session).
+        /// </summary>
+        protected bool HasNormalSession
+        {
+            get
+            {
+                return Context.User != null
+                    && Context.User.Identity.IsAuthenticated
+                    && !EmergencyFeature.EmergencyWeb.IsEmergency(Context)
+                    && Saml20Identity.IsInitialized();
+            }
+        }
 
         protected void Page_Load(object sender, EventArgs e)
         {

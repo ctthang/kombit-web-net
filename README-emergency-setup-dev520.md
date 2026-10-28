@@ -138,7 +138,7 @@ Stop/start `Identify dev520` once to load the new issuer client configuration (o
 2. In the same browser/profile, open `https://kombitspnew.safewhere.local/Emergency.aspx` and choose **Prepare this browser**. For an existing active credential, use renewal after a fresh normal login instead of generating another key.
 3. Complete authenticator registration, browser storage/read-back, and the separate possession check. Wait for **Ready**. The `poc-up` policy requires user presence, prefers user verification, and allows backed-up passkeys.
 4. Expand **Identify endpoint results (PoC)** and confirm the enrollment/completion or renewal responses. A successful response alone is not readiness.
-5. Open `https://kombitspnew.safewhere.local/EmergencyLogin.aspx`, choose the newest prepared credential, and complete the key check.
+5. Sign out, open `https://kombitspnew.safewhere.local/login.ashx`, choose **Emergency login** in the **Other login options** card, and complete the key check.
 6. On `EmergencyHome.aspx`, verify identity/organisation claims and the BPP privilege from the normal assertion. Normal assurance claims remain historical snapshot data; local emergency controls determine the session.
 7. Use **Sign out locally**. Normal federation logout and STS/service-token actions are unavailable during emergency access.
 
@@ -229,7 +229,26 @@ Updated the settings JSON key/state paths and both `EmergencyCredential.Settings
 Deployed the updated browser script. It removes **Forget browser copy** and shows account registrations whose browser copy is missing during normal-login preparation. The existing SAML registration has not been revoked automatically: remove it using the authenticated preparation page before retrying enrollment. The normal-login capture is in memory and must be renewed after a pool restart.
 
 
-## Provision the ASP.NET machine key
+## October 28, 2026: rebuilt machine, Identify issuer settings recreated
+
+This machine has a new user profile and a redeployed Identify dev520 Runtime (October 26). The SAML sample was already deployed and enabled: the deployed `Web.config` carries the emergency app settings, the `EmergencyNormalLogin` action, the four Fido2 binding redirects, and an encrypted machine key, and `C:\ProgramData\SafewhereSamples\SamlEmergency` holds `emergency-settings.json`, `decryption-key.bin`, and `encryption-public.jwk.json`. The protected private key opens on this machine with the configured audience and matches the public JWK; it was not regenerated.
+
+Two things were missing:
+
+- `issuer-signing-keys.json` was absent, so every emergency page returned 503 `emergency_unavailable` (FileNotFoundException in the state-file constructor) and normal login logged `normal_login_capture_failed`.
+- Identify dev520 Runtime had `EmergencyIssuer.Enabled=true` and `EmergencyIssuer.SettingsFile=C:\ProgramData\Safewhere\EmergencyIssuer\dev520\issuer-settings.json`, but that directory did not exist. Its signing-keys endpoint returned 503 with `configuration_invalid`.
+
+Actions taken:
+
+- Recreated `C:\ProgramData\Safewhere\EmergencyIssuer\dev520\issuer-settings.json` against the deployed Runtime's `EmergencyIssuerOptions`/`EmergencyClientOptions` schema: issuer `https://dev520.safewhere.local/runtime/emergency`, storage `C:\ProgramData\Safewhere\EmergencyIssuer\dev520\state`, lifetimes 24 h / 1 h / 30 days, and one client `saml-example` with `NormalProtocol` `saml`, the SP entity ID, the connection GUID recorded above, `NormalLoginIssuer` equal to the metadata entity ID `https://dev520.safewhere.local/runtime/`, the emergency audience, origin and RP ID, the public JWK's `kid`/`n`/`e`, `IssuanceEnabled` and `PreserveNormalClaims` true, and the same `ApiKey` as the sample's external settings (copied programmatically, never printed). The validator requires `NormalProtocol` to be exactly `saml` or `oidc`, `RelyingPartyId` to equal the origin host, and an API key of 32 to 512 characters.
+- Restricted the issuer directory to SYSTEM, Administrators, and the installing user; granted NETWORK SERVICE (the pool identity) read on the directory and modify on `state`. Identify has no access to the sample's private key.
+- A running Runtime worker caches a failed configuration, so the dev520 pool must be stopped, drained, and started once (elevated) before `/runtime/emergency/signing-keys` can return 200. Then save that response as `C:\ProgramData\SafewhereSamples\SamlEmergency\issuer-signing-keys.json`. The sample retries initialization on every request and needs no restart for this.
+
+Result: the `Identify dev520` pool (NetworkService, 64-bit) was stopped, drained, and started once from an elevated session. `/runtime/emergency/signing-keys` then returned HTTP 200 with one ES256 key, which was saved as the sample's `issuer-signing-keys.json`; the issuer created `issuer-state.bin` under its `state` directory. Without restarting the SAML pool, the sample initialized on its next request (`registry.bin` created) and `EmergencyLogin.aspx` and `Emergency.aspx` returned HTTP 200.
+
+Both IIS sites served the `*.safewhere.local` certificate without a Subject Alternative Name, which Chromium-based browsers reject (`ERR_CERT_COMMON_NAME_INVALID`) and which blocks WebAuthn. With approval, the `kombitspnew.safewhere.local` and `dev520.safewhere.local` HTTPS bindings were moved (elevated) from thumbprint `01DFC91D6B189B2BD7A56CE90CC67EE2B7CC5DCE` to the trusted `quickstart.safewhere.local` certificate `B70336090A9FFFA184404D7948A767726811218B`, whose SAN covers `*.safewhere.local`. No new certificate was trusted or created.
+
+A fresh dev520 normal login in the embedded browser then reached `MyPage.aspx`. Identify's Runtime log recorded `record_captured` for `clientId` `saml-example`, which confirms the connection GUID, and the sample logged `normal_login_captured`. `Emergency.aspx` shows **Prepare this browser** with no stored credential. Authenticator registration, the possession check, and emergency login with a physical key or passkey were left for the user and are not recorded here.
 
 Run [Set-EmergencyMachineKey.ps1](Set-EmergencyMachineKey.ps1) in an elevated PowerShell session against the deployed website, outside Git. Stop the pool first and wait until it is stopped:
 

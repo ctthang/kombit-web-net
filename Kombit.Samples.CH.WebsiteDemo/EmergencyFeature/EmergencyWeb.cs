@@ -214,6 +214,13 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                     context.ApplicationInstance.CompleteRequest();
                     return;
                 }
+                if (path.Equals("~/EmergencyLogin.aspx", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Emergency login now starts from the sign-in page; keep old links working.
+                    context.Response.Redirect(VirtualPathUtility.ToAbsolute("~/login.ashx"), false);
+                    context.ApplicationInstance.CompleteRequest();
+                    return;
+                }
                 try
                 {
                     CheckTransport(context);

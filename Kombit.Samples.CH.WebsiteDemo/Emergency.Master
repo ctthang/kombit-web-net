@@ -19,7 +19,6 @@
         <nav aria-label="Emergency access">
             <a href="<%= ResolveUrl("~/Default.aspx") %>">Normal application</a>
             <a href="<%= ResolveUrl("~/Emergency.aspx") %>" <% if (view.Mode == "prepare") { %>aria-current="page"<% } %>>Prepare</a>
-            <a href="<%= ResolveUrl("~/EmergencyLogin.aspx") %>" <% if (view.Mode == "login") { %>aria-current="page"<% } %>>Emergency login</a>
         </nav>
     </div>
 </header>
@@ -55,13 +54,6 @@
         <p class="hint">If issuance succeeded but storage or delivery failed, its binding can still count towards the issuer's key limit. Ask an Identify administrator to remove the binding before trying again.</p>
     </section>
 
-<% } else if (view.Mode == "login") { %>
-    <section class="card">
-        <h2>Local emergency login</h2>
-        <p class="lead">Select a locally stored credential. This page and the key check do not contact Identify.</p>
-        <ul id="saved-keys" class="key-list"><li class="empty">Loading stored keys&#8230;</li></ul>
-    </section>
-
 <% } else if (view.Mode == "home") { %>
     <section class="card">
         <div class="card-head">
@@ -83,9 +75,9 @@
 <% } else { %>
     <section class="card">
         <h2>Session ended</h2>
-        <p>Your emergency session expired or was ended. Log in again with a prepared key to continue.</p>
+        <p>Your emergency session expired or was ended. Sign in again to continue; the sign-in page offers emergency login when this browser has an active key.</p>
         <div class="actions">
-            <a class="button primary" href="<%= ResolveUrl("~/EmergencyLogin.aspx") %>">Go to emergency login</a>
+            <a class="button primary" href="<%= ResolveUrl("~/login.ashx") %>">Sign in again</a>
             <a class="button secondary" href="<%= ResolveUrl("~/Default.aspx") %>">Normal application</a>
         </div>
     </section>

@@ -239,9 +239,8 @@
             database.close();
         }
     }
-    async function prove(entry, login) {
-        const kind = login ? 'login' : 'activate';
-        const pending = await send(kind + '-options', {
+    async function prove(entry) {
+        const pending = await send('activate-options', {
             emergency_credential: entry.emergency_credential,
         });
         const options = pending.publicKey;
@@ -249,7 +248,7 @@
         options.allowCredentials.forEach(key => (key.id = bytes(key.id)));
         const key = await navigator.credentials.get({ publicKey: options });
         const response = key.response;
-        const result = await send(kind + '-complete', {
+        await send('activate-complete', {
             transaction_id: pending.transaction_id,
             credential: {
                 id: key.id,
@@ -264,12 +263,8 @@
                 },
             },
         });
-        if (login) {
-            location.assign(result.redirect);
-        } else {
-            show('Ready. This browser and key can now be used for emergency login.', 'success');
-            await displayKeys();
-        }
+        show('Ready. This browser and key can now be used for emergency login from the sign-in page.', 'success');
+        await displayKeys();
     }
     async function keep(entry) {
         const persistent =
@@ -284,7 +279,7 @@
         if (!saved || saved.emergency_credential !== entry.emergency_credential)
             throw new Error('Storage read-back failed. The credential is not ready.');
         show('Stored, pending activation. Check your key again.', 'busy');
-        await prove(saved, false);
+        await prove(saved);
     }
     connect('register', async () => {
         let pending;
@@ -343,7 +338,6 @@
             const current = state && state.credentials.find(item => item.ec_id === entry.ec_id);
             if (state && !current) continue;
             const expired = entry.expires_at * 1000 <= Date.now();
-            if (page.dataset.mode === 'login' && (expired || (await send('login-status', { emergency_credential: entry.emergency_credential })).active !== true)) continue;
             const status = current ? current.status : 'active';
             const row = element('li', 'key');
             const head = element('div', 'key-head');
@@ -368,15 +362,10 @@
                 ),
             );
             const actions = element('div', 'actions');
-            if (!state) {
-                if (!expired)
-                    actions.append(
-                        control('Log in with this key', () => prove(entry, true), 'primary'),
-                    );
-            } else {
+            if (state) {
                 if (current.status === 'pending')
                     actions.append(
-                        control('Confirm stored credential', () => prove(entry, false), 'primary'),
+                        control('Confirm stored credential', () => prove(entry), 'primary'),
                     );
                 if (current.status === 'active' && state.can_prepare)
                     actions.append(
@@ -432,7 +421,7 @@
                 element(
                     'li',
                     'empty',
-                    page.dataset.mode === 'login' ? 'This browser has no active emergency key. Use normal login to prepare or confirm a key.' : 'This browser has no matching prepared credential. Use normal login to prepare.',
+                    'This browser has no matching prepared credential. Use normal login to prepare.',
                 ),
             );
     }
@@ -440,5 +429,5 @@
         const result = await send('logout');
         location.assign(result.redirect);
     });
-    if (page.dataset.mode === 'prepare' || page.dataset.mode === 'login') action(displayKeys)();
+    if (page.dataset.mode === 'prepare') action(displayKeys)();
 })();

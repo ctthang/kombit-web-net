@@ -5,7 +5,18 @@
     <div class="row">
         <div class="col-md-12">
             <div class="div-row-btn-mypage">
+                <% if (HasNormalSession)
+                   { %>
                 <a href="MyPage.aspx" class="btn btn-info">Go to My Page</a>
+                <% if (Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyWeb.Enabled)
+                   { %>
+                <a href="<%= ResolveUrl("~/Emergency.aspx") %>" class="btn btn-default">Prepare emergency access</a>
+                <% } %>
+                <% }
+                   else
+                   { %>
+                <a href="MyPage.aspx" class="btn btn-info">Login to the app</a>
+                <% } %>
             </div>
         </div>
     </div>

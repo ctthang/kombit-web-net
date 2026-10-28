@@ -111,7 +111,12 @@
         </table>
 
         <div>
-            <asp:Button CssClass="btn btn-info" ID="btnLogoff" runat="server" Enabled="true" Text="Logoff" OnClick="Btn_Logoff_Click" /></div>
+            <asp:Button CssClass="btn btn-info" ID="btnLogoff" runat="server" Enabled="true" Text="Logoff" OnClick="Btn_Logoff_Click" />
+            <% if (Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyWeb.Enabled)
+                { %>
+            <a href="<%= ResolveUrl("~/Emergency.aspx") %>" class="btn btn-default">Prepare emergency access</a>
+            <% } %>
+        </div>
 
         <hr style="border-top: dotted; border-width: 1px;" />
         <div>

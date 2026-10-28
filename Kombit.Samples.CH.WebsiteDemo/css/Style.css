@@ -195,3 +195,164 @@ tfoot tr th:last-child {
     height: 100%;
     width: 100%;
   }
+/* Login options (login.ashx) */
+.login-page {
+    max-width: 960px;
+    margin: 0 auto 30px auto;
+}
+
+.login-intro h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 6px 0;
+    color: #1f2933;
+}
+
+.login-intro p {
+    color: #5b6470;
+    margin: 0 0 24px 0;
+}
+
+.login-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    align-items: start;
+}
+
+.login-card {
+    background: #ffffff;
+    border: 1px solid #e3e6ea;
+    border-top: 4px solid #91C84B;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 6px 16px rgba(16, 24, 40, 0.06);
+    padding: 24px;
+}
+
+.login-card[hidden] {
+    display: none;
+}
+
+.login-card-alt {
+    border-top-color: #f0ad4e;
+}
+
+.login-card-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 6px 0;
+    color: #1f2933;
+}
+
+.login-card-text {
+    color: #5b6470;
+    margin: 0 0 18px 0;
+}
+
+.login-card-note {
+    color: #6b7480;
+    font-size: 12px;
+    margin: 12px 0 0 0;
+}
+
+.idp-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.idp-list li + li {
+    margin-top: 10px;
+}
+
+.idp-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border: 1px solid #d6dbe1;
+    border-radius: 8px;
+    color: #1f2933;
+    background: #ffffff;
+    transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+
+a.idp-option:hover,
+a.idp-option:focus {
+    border-color: #6fa52f;
+    background: #f5faef;
+    box-shadow: 0 0 0 3px rgba(145, 200, 75, 0.25);
+    color: #1f2933;
+    text-decoration: none;
+    outline: none;
+}
+
+.idp-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin-right: 12px;
+}
+
+.idp-name {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.idp-address {
+    font-size: 12px;
+    color: #6b7480;
+    overflow-wrap: anywhere;
+}
+
+.idp-arrow {
+    color: #6fa52f;
+    font-size: 24px;
+    line-height: 1;
+}
+
+.idp-option.is-unavailable {
+    background: #f8f8f8;
+    color: #8a929c;
+    cursor: not-allowed;
+}
+
+.idp-status {
+    font-size: 12px;
+    color: #a94442;
+    white-space: nowrap;
+}
+
+.login-alt-button {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    font-weight: 600;
+}
+
+.login-alt-button + .login-alt-button {
+    margin-top: 10px;
+}
+
+.login-alt-status {
+    margin: 12px 0 0 0;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #f4f6f8;
+    color: #1f2933;
+}
+
+.login-alt-status[hidden] {
+    display: none;
+}
+
+.login-alt-status[data-tone="error"] {
+    background: #fdecea;
+    color: #a94442;
+}
+
+/* Home page actions */
+.div-row-btn-mypage .btn + .btn {
+    margin-left: 8px;
+}

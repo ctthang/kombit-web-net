@@ -28,8 +28,6 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 string file = System.IO.Path.GetFileName(Request.Path);
                 Mode =
                     file.Equals("Emergency.aspx", StringComparison.OrdinalIgnoreCase) ? "prepare"
-                    : file.Equals("EmergencyLogin.aspx", StringComparison.OrdinalIgnoreCase)
-                        ? "login"
                     : file.Equals("EmergencyHome.aspx", StringComparison.OrdinalIgnoreCase) ? "home"
                     : "ended";
                 if (Mode == "prepare")

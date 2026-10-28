@@ -357,6 +357,12 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="login.ashx" />
+    <Content Include="LoginOptions.aspx" />
+    <Compile Include="LoginOptions.aspx.cs">
+      <DependentUpon>LoginOptions.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="SignonHandler.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="metadata.ashx" />
@@ -439,6 +445,7 @@ xcopy /E /I /D /Q /Y "$(ProjectDir)EmergencyAssets" "$(SolutionDir)Deployment\Ko
     <Content Include="EmergencyApi.ashx" />
     <Content Include="EmergencyAssets\emergency.css" />
     <Content Include="EmergencyAssets\emergency.js" />
+    <Content Include="EmergencyAssets\login-options.js" />
     <Content Include="EmergencyEnded.aspx" />
     <Compile Include="EmergencyFeature\EmergencyApi.cs" />
     <Compile Include="EmergencyFeature\EmergencyDiagnostics.cs" />
@@ -448,7 +455,6 @@ xcopy /E /I /D /Q /Y "$(ProjectDir)EmergencyAssets" "$(SolutionDir)Deployment\Ko
     </Compile>
     <Compile Include="EmergencyFeature\EmergencyWeb.cs" />
     <Content Include="EmergencyHome.aspx" />
-    <Content Include="EmergencyLogin.aspx" />
     <ProjectReference Include="..\Kombit.Samples.CH.Emergency\Kombit.Samples.CH.Emergency.csproj">
       <Project>{C5F8CA15-728D-4A02-BDBB-067EAF6DA1D9}</Project>
       <Name>Kombit.Samples.CH.Emergency</Name>
