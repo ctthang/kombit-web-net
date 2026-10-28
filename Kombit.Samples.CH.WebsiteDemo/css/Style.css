@@ -369,3 +369,25 @@ a.idp-option:focus {
 .emergency-setup-actions .btn + .btn {
     margin-left: 8px;
 }
+
+/* Emergency access inline button (home page) */
+.emergency-inline {
+    display: inline-block;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.emergency-inline .btn-link {
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.emergency-inline-text {
+    margin-right: 6px;
+    color: #5b6470;
+}
+
+.emergency-inline-status {
+    margin-top: -6px;
+    margin-bottom: 1em;
+}

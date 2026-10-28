@@ -89,7 +89,7 @@
         <% if (EmergencyAvailable)
             { %>
         <section id="emergency-setup" class="login-card login-card-alt emergency-setup" aria-labelledby="emergency-setup-title"
-            data-api="<%: ResolveUrl("~/EmergencyApi.ashx") %>" data-csrf="<%: EmergencyCsrf %>"
+            data-api="<%: ResolveUrl("~/EmergencyApi.ashx") %>" data-csrf="<%: EmergencyCsrf %>" data-authenticator="<%: Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyWeb.Authenticator %>"
             data-manage="<%: ResolveUrl("~/Emergency.aspx") %>" data-login="<%: ResolveUrl("~/login.ashx") + "?ReturnUrl=" + HttpUtility.UrlEncode(ResolveUrl("~/MyPage.aspx")) %>">
             <h2 id="emergency-setup-title" class="login-card-title">Emergency access</h2>
             <p id="emergency-setup-text" class="login-card-text">Checking emergency access for this browser...</p>

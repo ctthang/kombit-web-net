@@ -36,6 +36,23 @@
             .replace(/\//g, '_');
     }
 
+    // Steer the browser to the configured authenticator so it can skip its chooser.
+    // EmergencyCredential.Authenticator: security-key | platform | any (no change).
+    // Registration also pins the attachment. Login only adds a hint: transports are a hard
+    // filter, so login uses the transports the key itself reported at registration instead.
+    function applyAuthenticator(options, ceremony) {
+        const kind = card.dataset.authenticator;
+        if (kind !== 'security-key' && kind !== 'platform') return options;
+        const roaming = kind === 'security-key';
+        options.hints = [roaming ? 'security-key' : 'client-device'];
+        if (ceremony === 'create') {
+            options.authenticatorSelection = Object.assign({}, options.authenticatorSelection, {
+                authenticatorAttachment: roaming ? 'cross-platform' : 'platform',
+            });
+        }
+        return options;
+    }
+
     async function send(operation, values) {
         const response = await fetch(card.dataset.api + '?op=' + encodeURIComponent(operation), {
             method: 'POST',
@@ -135,6 +152,10 @@
         const options = pending.publicKey;
         options.challenge = bytes(options.challenge);
         options.allowCredentials.forEach(key => (key.id = bytes(key.id)));
+        // Transports the key reported at registration (newer setups store them).
+        if (Array.isArray(entry.transports) && entry.transports.length)
+            options.allowCredentials.forEach(key => (key.transports = entry.transports.slice()));
+        applyAuthenticator(options, 'get');
         const key = await navigator.credentials.get({ publicKey: options });
         const response = key.response;
         const result = await send('login-complete', {

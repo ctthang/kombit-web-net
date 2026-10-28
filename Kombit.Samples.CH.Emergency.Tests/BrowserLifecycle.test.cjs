@@ -5,7 +5,7 @@ const flatten=e=>[e,...e.children.flatMap(flatten)];
 (async()=>{
 for(const [kind,file] of [['saml',require('node:path').resolve(__dirname,'../Kombit.Samples.CH.WebsiteDemo/EmergencyAssets/emergency.js')]]) {
 const source=fs.readFileSync(file,'utf8');new vm.Script(source);
-assert(!source.includes('Forget browser copy'));assert(!source.includes('activate-options'));assert(!source.includes('navigator.credentials'));
+assert(!source.includes('Forget browser copy'));assert(!source.includes('activate-options'));assert(!source.includes('navigator.credentials'));assert(!/[^.\w]confirm\(/.test(source),'native confirm() dialogs are suppressed by some browsers');
 const name=kind==='oidc'?'list':'displayKeys';
 const start=source.indexOf('    async function '+name+'()');
 const end=source.indexOf(kind==='oidc'?"    bind('signout'":"    connect('exit'",start);
@@ -21,7 +21,7 @@ for(const scenario of ['missing','versions','present','pending','failed-remove']
  api:async(p)=>{calls.push(p);if(p==='status')return state;if(p==='login/status'||p==='login-status')return {active:scenario!=='login-inactive'};if(scenario==='failed-remove')throw Error('unavailable');state.credentials=[];return {};},
  send:async(p)=>{calls.push(p);if(p==='status')return state;if(p==='login/status'||p==='login-status')return {active:scenario!=='login-inactive'};if(scenario==='failed-remove')throw Error('unavailable');state.credentials=[];return {};},
  setPreparationState:()=>{},element:(...a)=>new Element(...a),badge:(a,b)=>new Element('span',a,b),
- button:(t,fn)=>Object.assign(new Element('button',null,t),{fn}),control:(t,fn)=>Object.assign(new Element('button',null,t),{fn}),
+ button:(t,fn)=>Object.assign(new Element('button',null,t),{fn}),control:(t,fn)=>Object.assign(new Element('button',null,t),{fn}),confirmControl:(t,p,fn)=>Object.assign(new Element('button',null,t),{fn}),
  statusLabels:{active:'Active',pending:'Setup unfinished'},activateStored:async()=>{},deleteStoredBinding:async b=>deleted.push(b),message:()=>{},show:()=>{},confirm:()=>true,Date,Map};
  vm.createContext(ctx);vm.runInContext(code+`;globalThis.run=${name};`,ctx);await ctx.run();
  let nodes=flatten(container),buttons=nodes.filter(x=>x.tag==='button');

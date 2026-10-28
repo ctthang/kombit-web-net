@@ -64,25 +64,12 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         private void OfferEmergencySetup()
         {
-            if (!EmergencyFeature.EmergencyWeb.Enabled || !Saml20Identity.IsInitialized())
+            if (!Saml20Identity.IsInitialized())
             {
                 return;
             }
-            try
-            {
-                EmergencyFeature.EmergencyWeb.CheckTransport(Context);
-                EmergencyCsrf = EmergencyFeature.EmergencyWeb.Csrf(Context);
-                EmergencyAvailable = true;
-            }
-            catch (Kombit.Samples.CH.Emergency.EmergencyFailure)
-            {
-                // Wrong host or support unavailable: the card is not shown.
-            }
-            catch (Exception exception)
-                when (!(exception is System.Threading.ThreadAbortException))
-            {
-                EmergencyFeature.EmergencyDiagnostics.Log(Context, 503, "setup_card_unavailable", exception);
-            }
+            EmergencyCsrf = EmergencyFeature.EmergencyWeb.WidgetToken(Context, "setup_card_unavailable");
+            EmergencyAvailable = EmergencyCsrf != null;
         }
 
         protected void Page_Load(object sender, EventArgs e)

@@ -6,7 +6,6 @@ using System.Linq;
 using System.Web;
 using System.Web.UI;
 using dk.nita.saml20.config;
-using Kombit.Samples.CH.Emergency;
 using Kombit.Samples.CH.WebsiteDemo.EmergencyFeature;
 
 #endregion
@@ -47,25 +46,8 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         private void OfferEmergencyLogin()
         {
-            if (!EmergencyWeb.Enabled || EmergencyWeb.IsEmergency(Context))
-            {
-                return;
-            }
-            try
-            {
-                EmergencyWeb.CheckTransport(Context);
-                EmergencyCsrf = EmergencyWeb.Csrf(Context);
-                EmergencyAvailable = true;
-            }
-            catch (EmergencyFailure)
-            {
-                // Wrong host or support unavailable: normal login stays the only option.
-            }
-            catch (Exception exception)
-                when (!(exception is System.Threading.ThreadAbortException))
-            {
-                EmergencyDiagnostics.Log(Context, 503, "login_options_unavailable", exception);
-            }
+            EmergencyCsrf = EmergencyWeb.WidgetToken(Context, "login_options_unavailable");
+            EmergencyAvailable = EmergencyCsrf != null;
         }
 
         private static string DisplayName(IDPEndPoint idp)

@@ -1,6 +1,7 @@
 (function () {
     'use strict';
-    // Emergency access card on My Page. After a normal login it:
+    // Emergency access widget: a card on My Page, or an inline button on the home page
+    // (data-layout="inline", label from data-setup-label). After a normal login it:
     // - offers one-click setup for this browser (one WebAuthn registration prompt),
     // - finishes any setup that stopped after the browser stored its credential,
     // - renews an active credential silently once half its lifetime has passed.
@@ -11,6 +12,7 @@
     const text = document.getElementById('emergency-setup-text');
     const actions = document.getElementById('emergency-setup-actions');
     const status = document.getElementById('emergency-setup-status');
+    const inline = card.dataset.layout === 'inline';
     const database = 'saml-emergency-credentials-v1';
 
     const messages = {
@@ -26,8 +28,9 @@
         status.hidden = !message;
     }
 
-    function describe(lines, buttons) {
-        text.textContent = lines;
+    // The inline layout shows the short text (or none) next to its buttons.
+    function describe(lines, buttons, short) {
+        text.textContent = inline ? short || '' : lines;
         actions.replaceChildren(...(buttons || []));
     }
 
@@ -58,6 +61,23 @@
             .replace(/=/g, '')
             .replace(/\+/g, '-')
             .replace(/\//g, '_');
+    }
+
+    // Steer the browser to the configured authenticator so it can skip its chooser.
+    // EmergencyCredential.Authenticator: security-key | platform | any (no change).
+    // Registration also pins the attachment. Login only adds a hint: transports are a hard
+    // filter, so login uses the transports the key itself reported at registration instead.
+    function applyAuthenticator(options, ceremony) {
+        const kind = card.dataset.authenticator;
+        if (kind !== 'security-key' && kind !== 'platform') return options;
+        const roaming = kind === 'security-key';
+        options.hints = [roaming ? 'security-key' : 'client-device'];
+        if (ceremony === 'create') {
+            options.authenticatorSelection = Object.assign({}, options.authenticatorSelection, {
+                authenticatorAttachment: roaming ? 'cross-platform' : 'platform',
+            });
+        }
+        return options;
     }
 
     async function send(operation, values) {
@@ -149,7 +169,16 @@
             options.challenge = bytes(options.challenge);
             options.user.id = bytes(options.user.id);
             (options.excludeCredentials || []).forEach(key => (key.id = bytes(key.id)));
+            // Emergency login always names the key (allowCredentials), so a discoverable passkey is
+            // not needed. Asking for a non-discoverable credential lets Windows and browsers skip
+            // their "Save your passkey" step and keeps security-key slots free.
+            options.authenticatorSelection = Object.assign({}, options.authenticatorSelection, {
+                residentKey: 'discouraged',
+                requireResidentKey: false,
+            });
+            applyAuthenticator(options, 'create');
             const key = await navigator.credentials.create({ publicKey: options });
+            const transports = key.response.getTransports ? key.response.getTransports() : [];
             const entry = await send('enroll-complete', {
                 id: pending.enrollment_id,
                 credential: {
@@ -160,11 +189,13 @@
                     response: {
                         clientDataJSON: encode(key.response.clientDataJSON),
                         attestationObject: encode(key.response.attestationObject),
-                        transports: key.response.getTransports ? key.response.getTransports() : [],
+                        transports,
                     },
                 },
             });
             pending = null;
+            // Kept with the browser copy so emergency login can target this key's transports.
+            entry.transports = transports;
             await storeAndActivate(entry);
         } finally {
             if (pending) {
@@ -178,8 +209,8 @@
     function setupButton() {
         const element = document.createElement('button');
         element.type = 'button';
-        element.className = 'btn btn-primary';
-        element.textContent = 'Set up emergency access';
+        element.className = inline ? 'btn btn-default' : 'btn btn-primary';
+        element.textContent = card.dataset.setupLabel || 'Set up emergency access';
         element.addEventListener('click', async () => {
             element.disabled = true;
             show('Follow your browser\'s prompt to register your security key or passkey...', 'busy');
@@ -220,12 +251,15 @@
         }
 
         const ready = mine.filter(item => item.status === 'active' && byId.has(item.ec_id));
-        const manage = link('Manage keys', card.dataset.manage);
+        const manage = link('Manage keys', card.dataset.manage, inline ? 'btn-link' : 'btn-default');
         if (ready.length) {
             const due = ready.find(item => item.renew_due);
             if (allowRenewal && due && state.can_prepare) {
                 try {
-                    await storeAndActivate(await send('renew', { binding_id: due.binding_id }));
+                    const renewed = await send('renew', { binding_id: due.binding_id });
+                    // Renewal keeps the same key, so carry its registered transports over.
+                    renewed.transports = (byId.get(due.ec_id) || {}).transports || [];
+                    await storeAndActivate(renewed);
                     return refresh(false);
                 } catch (_) {
                     // Renewal is retried after the next normal login; the current key stays valid.
@@ -236,6 +270,7 @@
                 'Emergency access is ready on this browser until ' + date(latest) +
                     '. It renews automatically when you sign in normally.',
                 [manage],
+                'Emergency access ready until ' + date(latest) + '.',
             );
             card.dataset.state = 'ready';
             return;
@@ -248,13 +283,18 @@
                 'A key is registered for your account, but this browser no longer has its copy. ' +
                     'Remove that key under Manage keys, then set up emergency access again.',
                 [manage],
+                'This browser lost its emergency key copy.',
             );
             return;
         }
         if (!state.can_prepare) {
             describe(
                 'Sign in again to set up emergency access for this browser.',
-                [link('Sign in again', card.dataset.login, 'btn-primary')],
+                [
+                    inline
+                        ? link('Sign in again to prepare emergency access', card.dataset.login)
+                        : link('Sign in again', card.dataset.login, 'btn-primary'),
+                ],
             );
             return;
         }
@@ -266,11 +306,15 @@
     }
 
     if (!window.PublicKeyCredential || !window.indexedDB || !window.fetch) {
-        describe('This browser does not support security keys or passkeys, so emergency access cannot be set up here.');
+        describe(
+            'This browser does not support security keys or passkeys, so emergency access cannot be set up here.',
+            [],
+            'This browser cannot use emergency access.',
+        );
         return;
     }
     refresh(true).catch(error => {
-        describe('Emergency access status is unavailable right now.');
+        describe('Emergency access status is unavailable right now.', [], 'Emergency access status is unavailable.');
         show(error.message, 'error');
     });
 })();

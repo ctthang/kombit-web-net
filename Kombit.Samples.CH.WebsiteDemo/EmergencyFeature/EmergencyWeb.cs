@@ -41,6 +41,26 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
             }
         }
 
+        /// <summary>
+        ///     Preferred authenticator for emergency setup and login, from the
+        ///     <c>EmergencyCredential.Authenticator</c> app setting: <c>security-key</c> (roaming
+        ///     USB/NFC/BLE key), <c>platform</c> (this device, such as Windows Hello), or <c>any</c>
+        ///     (default; the browser offers every option). The browser scripts turn it into WebAuthn
+        ///     hints so the browser can skip its authenticator chooser. Unknown values mean <c>any</c>.
+        /// </summary>
+        public static string Authenticator
+        {
+            get
+            {
+                string value = (
+                    ConfigurationManager.AppSettings["EmergencyCredential.Authenticator"] ?? string.Empty
+                )
+                    .Trim()
+                    .ToLowerInvariant();
+                return value == "security-key" || value == "platform" ? value : "any";
+            }
+        }
+
         [CLSCompliant(false)]
         public static EmergencySettings Settings
         {
@@ -355,6 +375,33 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 SetCookie(context, BrowserCookie, value);
             }
             return value;
+        }
+
+        /// <summary>
+        ///     CSRF token for an emergency widget on a normal site page (sign-in options, home page,
+        ///     My Page), or null when the widget must not be shown: support disabled, an emergency
+        ///     session, the wrong host, or the service unavailable (the last is logged).
+        /// </summary>
+        public static string WidgetToken(HttpContext context, string failureCode)
+        {
+            if (!Enabled || IsEmergency(context))
+            {
+                return null;
+            }
+            try
+            {
+                CheckTransport(context);
+                return Csrf(context);
+            }
+            catch (EmergencyFailure)
+            {
+                return null;
+            }
+            catch (Exception exception) when (!(exception is ThreadAbortException))
+            {
+                EmergencyDiagnostics.Log(context, 503, failureCode, exception);
+                return null;
+            }
         }
 
         public static string Csrf(HttpContext context)

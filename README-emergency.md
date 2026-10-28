@@ -117,6 +117,18 @@ These events use the existing log4net logger `Kombit.Samples.CH.WebsiteDemo.Emer
 
 No request bodies, query values, cookies, tokens, credentials, API keys, or claim values are added to these lifecycle events. Existing sanitized failure records retain exception types/HResults and bounded stack method/line details. Logging failures do not interrupt the operation. A successful local removal can still have a failed upstream revocation summary because its retry is queued internally.
 
+## Preferred authenticator
+
+Set `EmergencyCredential.Authenticator` in the deployed `Web.config` app settings to choose which authenticator the browser asks for during emergency setup and emergency login:
+
+| Value | Effect |
+|---|---|
+| `any` (default) | No preference. The browser shows its chooser (security key, this device, phone). |
+| `security-key` | Registration asks for a roaming key (`authenticatorAttachment: cross-platform`, hint `security-key`); login offers only USB, NFC, and BLE transports. |
+| `platform` | Registration uses this device, such as Windows Hello (`authenticatorAttachment: platform`, hint `client-device`); login offers only the internal transport. |
+
+Unknown values behave as `any`. The browser scripts add these preferences to the options before the WebAuthn prompt; Identify's registration options and the server's assertion checks are unchanged. A specific value lets supporting browsers skip the authenticator chooser, but the operating system's touch, PIN, or Windows Hello prompt always remains. Keys registered under a different preference may not be offered for login, so choose the value before users prepare their browsers. Changing `Web.config` restarts the application.
+
 ## Authenticator policy compatibility
 
 The current issuer and both clients use `poc-up`: presence is required, verification is preferred, and valid backup-eligible/backed-up passkeys are accepted. A backup-state bit without backup eligibility is rejected. Signature, origin/RP, one-use challenge, credential ownership, and counter checks remain enforced. Credentials labeled with the older `poc-uv-nonbackup` policy must be renewed to the current policy; they are not silently reinterpreted.

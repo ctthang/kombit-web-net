@@ -8,9 +8,14 @@
                 <% if (HasNormalSession)
                    { %>
                 <a href="MyPage.aspx" class="btn btn-info">Go to My Page</a>
-                <% if (Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyWeb.Enabled)
+                <% if (EmergencyAvailable)
                    { %>
-                <a href="<%= ResolveUrl("~/MyPage.aspx") + "#emergency-setup" %>" class="btn btn-default">Prepare emergency access</a>
+                <span id="emergency-setup" class="emergency-inline" data-layout="inline" data-setup-label="Prepare emergency access"
+                    data-api="<%: ResolveUrl("~/EmergencyApi.ashx") %>" data-csrf="<%: EmergencyCsrf %>" data-authenticator="<%: Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyWeb.Authenticator %>"
+                    data-manage="<%: ResolveUrl("~/Emergency.aspx") %>" data-login="<%: ResolveUrl("~/login.ashx") + "?ReturnUrl=" + HttpUtility.UrlEncode(ResolveUrl("~/Default.aspx")) %>">
+                    <span id="emergency-setup-text" class="emergency-inline-text"></span>
+                    <span id="emergency-setup-actions"><button type="button" class="btn btn-default" disabled="disabled">Prepare emergency access</button></span>
+                </span>
                 <% } %>
                 <% }
                    else
@@ -18,6 +23,11 @@
                 <a href="MyPage.aspx" class="btn btn-info">Login to the app</a>
                 <% } %>
             </div>
+            <% if (EmergencyAvailable)
+               { %>
+            <p id="emergency-setup-status" class="login-alt-status emergency-inline-status" role="status" aria-live="polite" hidden="hidden"></p>
+            <script type="text/javascript" src="<%: ((Kombit.Samples.CH.WebsiteDemo.sp)Master).AssetUrl("~/EmergencyAssets/setup.js") %>" defer="defer"></script>
+            <% } %>
         </div>
     </div>
     <% if (string.IsNullOrEmpty(SAML20FederationConfig.GetConfig().Endpoints.MetadataLocation))

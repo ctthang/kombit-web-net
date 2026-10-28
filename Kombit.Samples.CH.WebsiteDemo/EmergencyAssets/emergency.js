@@ -229,6 +229,34 @@
         button.addEventListener('click', action(work));
         return button;
     }
+    // Destructive actions confirm inline: the first click arms the button, a second click
+    // within a few seconds runs it. No native dialog, which some browsers suppress.
+    function confirmControl(label, prompt, work) {
+        const button = element('button', 'danger', label);
+        button.type = 'button';
+        let armed = false;
+        let timer = null;
+        const disarm = () => {
+            armed = false;
+            button.textContent = label;
+        };
+        button.addEventListener(
+            'click',
+            action(async () => {
+                if (!armed) {
+                    armed = true;
+                    button.textContent = 'Confirm removal';
+                    show(prompt + ' Select "Confirm removal" to continue.', 'info');
+                    timer = setTimeout(disarm, 8000);
+                    return;
+                }
+                clearTimeout(timer);
+                disarm();
+                await work();
+            }),
+        );
+        return button;
+    }
     const statusLabels = {
         pending: 'Setup unfinished',
         active: 'Active',
@@ -276,10 +304,10 @@
                         control('Finish setup', () => activateStored(entry), 'primary'),
                     );
                 actions.append(
-                    control(
+                    confirmControl(
                         'Remove key locally',
+                        'Remove key \u2026' + entry.binding_id.slice(-6) + ' and end its emergency sessions?',
                         async () => {
-                            if (!confirm('Remove key \u2026' + entry.binding_id.slice(-6) + '?')) return;
                             await send('remove', { binding_id: entry.binding_id });
                             await deleteStoredBinding(entry.binding_id);
                             show(
@@ -288,7 +316,6 @@
                             );
                             await displayKeys();
                         },
-                        'danger',
                     ),
                 );
                 const id = element('span', 'key-meta', 'Binding ID: ');
@@ -308,13 +335,12 @@
                 const row = element('li', 'key');
                 row.append(element('span', 'key-name', 'Key \u2026' + entry.binding_id.slice(-6)),
                     element('p', 'key-meta', 'Browser copy missing. Remove this registration before preparing the same authenticator again. This also ends its emergency sessions in other browsers.'));
-                row.append(control('Remove key locally', async () => {
-                    if (!confirm('Remove registration for key \u2026' + entry.binding_id.slice(-6) + ' and end its emergency sessions?')) return;
+                row.append(confirmControl('Remove key locally', 'Remove registration for key \u2026' + entry.binding_id.slice(-6) + ' and end its emergency sessions?', async () => {
                     await send('remove', { binding_id: entry.binding_id });
                     await deleteStoredBinding(entry.binding_id);
                     show('Registration removed locally. If Identify is unavailable, its revocation is queued; wait for it to synchronize before preparing this key again.', 'success');
                     await displayKeys();
-                }, 'danger'));
+                }));
                 list.append(row);
             }
         }

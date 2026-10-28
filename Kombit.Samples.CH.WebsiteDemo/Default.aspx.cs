@@ -36,8 +36,18 @@ namespace Kombit.Samples.CH.WebsiteDemo
             }
         }
 
+        /// <summary>True when "Prepare emergency access" runs in place on this page.</summary>
+        protected bool EmergencyAvailable { get; private set; }
+
+        protected string EmergencyCsrf { get; private set; }
+
         protected void Page_Load(object sender, EventArgs e)
         {
+            if (HasNormalSession)
+            {
+                EmergencyCsrf = EmergencyFeature.EmergencyWeb.WidgetToken(Context, "home_setup_unavailable");
+                EmergencyAvailable = EmergencyCsrf != null;
+            }
             try
             {
                 FederationConfig.GetConfig().GetFirstValidCertificate();
