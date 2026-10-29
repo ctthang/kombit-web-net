@@ -144,6 +144,7 @@ namespace Kombit.Samples.CH.Emergency
             {
                 throw new EmergencyFailure(502, "issuer_response_rejected");
             }
+            LabelPasskey(result["publicKey"]["user"] as JObject, login.Subject);
             lock (state.SyncRoot)
             {
                 registrations.Add(
@@ -157,6 +158,31 @@ namespace Kombit.Samples.CH.Emergency
                 );
             }
             return result;
+        }
+
+        /// <summary>
+        ///     Adds the account's subject (the credential's <c>sub</c>, the SAML NameID) to the new
+        ///     passkey's labels, for example "Emergency user: admin", so passkey lists in the browser
+        ///     and Windows tell keys apart. Name and display name are labels only; they are not part
+        ///     of the attestation Identify verifies.
+        /// </summary>
+        public static void LabelPasskey(JObject user, string subject)
+        {
+            if (user == null || string.IsNullOrWhiteSpace(subject))
+            {
+                return;
+            }
+            // The full subject is kept, even a long X.509 subject name; an authenticator may still
+            // shorten what it displays.
+            string clean = new string(subject.Trim().Where(character => !char.IsControl(character)).ToArray());
+            foreach (string field in new[] { "name", "displayName" })
+            {
+                string label = user[field]?.Type == JTokenType.String ? (string)user[field] : null;
+                if (!string.IsNullOrWhiteSpace(label) && clean.Length > 0)
+                {
+                    user[field] = label + ": " + clean;
+                }
+            }
         }
 
         public async Task<JObject> FinishRegistration(

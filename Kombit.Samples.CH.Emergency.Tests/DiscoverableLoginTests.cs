@@ -265,6 +265,34 @@ namespace Kombit.Samples.CH.Emergency.Tests
         }
 
         [TestMethod]
+        public async Task BeginRegistration_LabelsThePasskeyWithTheSubject()
+        {
+            using (var fixture = new SamlFixture())
+            {
+                JObject user = (JObject)(await fixture.Access.BeginRegistration(
+                    fixture.Login(),
+                    fixture.Browser,
+                    CancellationToken.None
+                ))["publicKey"]["user"];
+
+                Assert.AreEqual("Emergency user: user", (string)user["name"]);
+                Assert.AreEqual("Emergency access: user", (string)user["displayName"]);
+            }
+        }
+
+        [TestMethod]
+        public void LabelPasskey_KeepsTheFullSubjectWithoutControlCharacters()
+        {
+            const string subject = "C = DK, O = 19435075, CN = idpdemouser, Serial = 555ed208-2ed1-4739-8d79-119908219319";
+            var user = new JObject { ["name"] = "Emergency user", ["displayName"] = JValue.CreateNull() };
+
+            EmergencyAccess.LabelPasskey(user, " " + subject.Replace("CN", "C\nN") + " ");
+
+            Assert.AreEqual("Emergency user: " + subject, (string)user["name"]);
+            Assert.AreEqual(JTokenType.Null, user["displayName"].Type, "a missing label stays as Identify sent it");
+        }
+
+        [TestMethod]
         public async Task IsBindingActiveForLogin_ReflectsRegistryState()
         {
             using (var fixture = new SamlFixture())

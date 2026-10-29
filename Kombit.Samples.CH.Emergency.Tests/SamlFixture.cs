@@ -533,6 +533,12 @@ namespace Kombit.Samples.CH.Emergency.Tests
                         ["publicKey"] = new JObject
                         {
                             ["rp"] = new JObject { ["id"] = Settings.RpId },
+                            ["user"] = new JObject
+                            {
+                                ["id"] = Wire.RandomId(),
+                                ["name"] = "Emergency user",
+                                ["displayName"] = "Emergency access",
+                            },
                         },
                     };
             }
