@@ -44,7 +44,7 @@
             <% if (EmergencyAvailable)
                { %>
             <section id="emergency-login-option" class="login-card login-card-alt" aria-labelledby="alt-title" hidden="hidden"
-                data-api="<%: ResolveUrl("~/EmergencyApi.ashx") %>" data-csrf="<%: EmergencyCsrf %>" data-authenticator="<%: Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyWeb.Authenticator %>">
+                data-api="<%: ResolveUrl("~/EmergencyApi.ashx") %>" data-csrf="<%: EmergencyCsrf %>" data-authenticator="<%: Kombit.Samples.CH.WebsiteDemo.EmergencyFeature.EmergencyWeb.Authenticator %>" data-continue="<%: AutoContinueUrl %>">
                 <h2 id="alt-title" class="login-card-title">Other login options</h2>
                 <p class="login-card-text">This browser has an emergency key. Use it only when normal sign-in through your identity provider is unavailable.</p>
                 <div id="emergency-login-actions" class="login-alt-actions"></div>

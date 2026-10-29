@@ -5,7 +5,16 @@
     // check in place: one WebAuthn prompt, then the emergency home page. Discovery is read-only:
     // it never creates browser storage, never contacts Identify, and never prompts for a key.
     const card = document.getElementById('emergency-login-option');
-    if (!card || !window.indexedDB || !window.PublicKeyCredential || !window.fetch) return;
+    if (!card) return;
+    // With a single (or default) IdP the page is shown only to offer emergency login. When this
+    // browser has no active key, continue to that IdP as if the page had never been shown.
+    const proceed = () => {
+        if (card.dataset.continue) location.replace(card.dataset.continue);
+    };
+    if (!window.indexedDB || !window.PublicKeyCredential || !window.fetch) {
+        proceed();
+        return;
+    }
     const actions = document.getElementById('emergency-login-actions');
     const status = document.getElementById('emergency-login-status');
 
@@ -222,7 +231,10 @@
     (async function () {
         try {
             const keys = await activeKeys();
-            if (!keys.length) return;
+            if (!keys.length) {
+                proceed();
+                return;
+            }
             keys.sort((a, b) => b.expires_at - a.expires_at);
             actions.replaceChildren(
                 ...keys.map(entry =>
@@ -237,6 +249,7 @@
             card.hidden = false;
         } catch (_) {
             // Any failure keeps the card hidden; normal login is unaffected.
+            proceed();
         }
     })();
 })();

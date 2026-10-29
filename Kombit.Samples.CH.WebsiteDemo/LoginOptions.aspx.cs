@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Web;
 using System.Web.UI;
 using dk.nita.saml20.config;
@@ -25,24 +24,39 @@ namespace Kombit.Samples.CH.WebsiteDemo
 
         protected string EmergencyCsrf { get; private set; }
 
+        /// <summary>
+        ///     Sign-in URL of the only (or default) IdP when the page was shown just to offer emergency
+        ///     login; the browser script continues there when this browser has no active key.
+        /// </summary>
+        protected string AutoContinueUrl { get; private set; }
+
         protected void Page_Load(object sender, EventArgs e)
         {
             Title = "Sign in";
-            string returnUrl = Request.QueryString["ReturnUrl"];
-            string suffix = IsLocalUrl(returnUrl)
-                ? "&ReturnUrl=" + HttpUtility.UrlEncode(returnUrl)
-                : string.Empty;
-            IdentityProviders = SAML20FederationConfig
-                .GetConfig()
-                .Endpoints.IDPEndPoints.Select(idp => new IdentityProviderOption(
-                    DisplayName(idp),
-                    Address(idp.Id),
-                    idp.GetIDPLoginUrl(false, false, null, null) + suffix,
-                    idp.metadata != null
-                ))
-                .ToList();
+            // Only IdPs configured in web.config are offered. Each link keeps the sign-in options the
+            // caller asked for, such as My Page's ForceAuthn and passive re-login buttons.
+            string autoContinueIdp = Context.Items[SignonHandler.AutoContinueIdpKey] as string;
+            IdentityProviders = new List<IdentityProviderOption>();
+            foreach (IDPEndPoint idp in ConfiguredIdentityProviders.All())
+            {
+                string loginUrl = ConfiguredIdentityProviders.LoginUrl(idp, Request);
+                IdentityProviders.Add(
+                    new IdentityProviderOption(
+                        DisplayName(idp),
+                        Address(idp.Id),
+                        loginUrl,
+                        idp.metadata != null
+                    )
+                );
+                if (string.Equals(idp.Id, autoContinueIdp, StringComparison.Ordinal))
+                {
+                    AutoContinueUrl = loginUrl;
+                }
+            }
             OfferEmergencyLogin();
         }
+
+
 
         private void OfferEmergencyLogin()
         {
@@ -67,13 +81,6 @@ namespace Kombit.Samples.CH.WebsiteDemo
             return Uri.TryCreate(id, UriKind.Absolute, out uri) ? id : string.Empty;
         }
 
-        private static bool IsLocalUrl(string url)
-        {
-            return !string.IsNullOrEmpty(url)
-                && url.StartsWith("/", StringComparison.Ordinal)
-                && !url.StartsWith("//", StringComparison.Ordinal)
-                && !url.StartsWith("/\\", StringComparison.Ordinal);
-        }
 
         protected sealed class IdentityProviderOption
         {

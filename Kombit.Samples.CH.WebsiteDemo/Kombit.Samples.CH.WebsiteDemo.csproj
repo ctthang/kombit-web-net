@@ -364,6 +364,7 @@
     </Compile>
     <Compile Include="SignonHandler.cs" />
     <Compile Include="AssetVersion.cs" />
+    <Compile Include="ConfiguredIdentityProviders.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="metadata.ashx" />
