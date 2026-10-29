@@ -248,7 +248,10 @@ namespace Kombit.Samples.CH.Emergency.Tests
                     ["clientDataJSON"] = Wire.Encode(clientBytes),
                     ["authenticatorData"] = Wire.Encode(data),
                     ["signature"] = Wire.Encode(signature),
-                    ["userHandle"] = mutation == "handle" ? Wire.RandomId() : UserHandle,
+                    // A JSON null, as a browser sends it (a C# null string would be a string token).
+                    ["userHandle"] = mutation == "handle" ? new JValue(Wire.RandomId())
+                        : mutation == "nohandle" ? JValue.CreateNull()
+                        : new JValue(UserHandle),
                 },
             };
         }

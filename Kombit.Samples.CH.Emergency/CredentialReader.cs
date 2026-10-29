@@ -199,6 +199,14 @@ namespace Kombit.Samples.CH.Emergency
                     ["initial_counter"] = count,
                     ["digest"] = Wire.Hash(encrypted),
                     ["claims"] = claims.DeepClone(),
+                    // The decrypted, signature-verified credential, kept so the emergency home page
+                    // can show it. It lives only in the MachineKey-protected registry.
+                    ["raw"] = new JObject
+                    {
+                        ["jwe_header"] = outer.DeepClone(),
+                        ["jws_header"] = header.DeepClone(),
+                        ["payload"] = payload.DeepClone(),
+                    },
                 };
             }
             catch (Exception exception) when (!(exception is EmergencyFailure))

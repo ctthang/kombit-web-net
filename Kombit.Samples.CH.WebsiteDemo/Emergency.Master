@@ -39,11 +39,10 @@
         </div>
     </section>
     <section class="card">
-        <h2>Keys stored in this browser</h2>
-        <p id="storage-note" class="hint">Clearing or evicting site data loses preparation. A different browser profile is not prepared.</p>
-        <ul id="saved-keys" class="key-list"><li class="empty">Loading stored keys&#8230;</li></ul>
-        <p class="hint">If issuance succeeded but storage or delivery failed, its binding can still count towards the issuer's key limit. Ask an Identify administrator to remove the binding before trying again.</p>
-    </section>
+        <h2>Keys registered for your account</h2>
+        <p class="hint">Emergency login uses the passkey itself; this browser stores no emergency credential. Removing a key ends its emergency sessions everywhere.</p>
+        <ul id="saved-keys" class="key-list"><li class="empty">Loading keys&#8230;</li></ul>
+   </section>
 
 <% } else if (view.Mode == "home") { %>
     <section class="card">
@@ -62,6 +61,74 @@
             <div><dt><%: claim.Type %></dt><dd><%: claim.Value %></dd></div><% } } %>
         </dl>
     </section>
+    <section class="card">
+        <h3>Emergency credential (decrypted)</h3>
+        <p class="hint">The emergency credential (EC) behind this session, as Identify issued it: decrypted with this site's private key and verified against Identify's signing key when it was issued. It is kept only in this site's MachineKey-protected registry; the browser never receives it.</p>
+        <% if (view.SessionCredential != null) { %>
+        <dl class="stats">
+            <div><dt>EC ID</dt><dd class="mono"><%: (string)view.SessionCredential["ec_id"] %></dd></div>
+            <div><dt>Key binding</dt><dd class="mono"><%: (string)view.SessionCredential["binding_id"] %></dd></div>
+            <div><dt>Status</dt><dd><%: (string)view.SessionCredential["status"] %></dd></div>
+            <div><dt>Issued</dt><dd><%: view.FormatTime(view.SessionCredential["issued"]) %></dd></div>
+            <div><dt>Expires</dt><dd><%: view.FormatTime(view.SessionCredential["expires"]) %></dd></div>
+        </dl>
+        <% } %>
+        <% if (view.RawCredentialJson != null) { %>
+        <pre class="raw-json"><code><%: view.RawCredentialJson %></code></pre>
+        <% } else { %>
+        <p class="notice">This credential was issued before the site kept a decrypted copy. It is shown here for credentials issued or renewed from now on: renewal happens automatically after a normal login once half its lifetime has passed, or remove the key under Manage keys and set it up again.</p>
+        <% } %>
+    </section>
+    <section class="card how-it-works">
+        <h3>How emergency login works</h3>
+        <p class="lead">Emergency login lets a user who signed in normally before keep working while the identity provider (IdP) or Identify (CH2) is unavailable. It rests on a passkey (WebAuthn) and on a credential Identify signed during an earlier normal login.</p>
+
+        <h4>1. Normal login: Identify keeps a claims record</h4>
+        <ul>
+            <li>The user signs in through the IdP. When Identify issues the SAML assertion, it also keeps a copy of the claims it put into that assertion, for up to 24 hours (<code>PreserveNormalClaims</code>).</li>
+            <li>This site's <code>EmergencyNormalLogin</code> action records the accepted login in memory as a one-time record that may start one setup or renewal.</li>
+        </ul>
+
+        <h4>2. Setup (registration): passkey and emergency credential</h4>
+        <ol>
+            <li>The site asks Identify to start an enrollment for that login (<code>POST emergency/enrollments</code>, authenticated with the client's API key). Identify returns WebAuthn registration options: this site's RP ID <code>kombitspnew.safewhere.local</code>, a user handle, and a one-time challenge.</li>
+            <li>The browser calls <code>navigator.credentials.create()</code> asking for a discoverable passkey with user verification required. The authenticator (Windows Hello, a passkey manager, or a security key) creates a new key pair for this site. The private key never leaves the authenticator; it returns the credential ID and the public key, signed into an attestation object.</li>
+            <li>The site forwards that response to Identify (<code>POST emergency/enrollments/{id}/complete</code>). Identify verifies the challenge, origin, RP ID and flags, records the key binding, and builds the EC: the user (<code>sub</code>, NameID details), the source login, the passkey (<code>webauthn</code>, public key in <code>cnf.jwk</code>) and the claims snapshot. It signs the EC with its emergency signing key (ES256) and encrypts it with this site's public RSA key (RSA-OAEP, A256CBC-HS512).</li>
+            <li>The site decrypts the EC with its private key (protected by machine-bound DPAPI), verifies Identify's signature against its trusted signing keys, checks issuer, audience, lifetime, origin, RP ID and that the EC belongs to the account that signed in, then stores and activates it. The browser only receives the binding ID and expiry.</li>
+        </ol>
+
+        <h4>3. What is stored where</h4>
+        <dl class="claims">
+            <div><dt>Authenticator or passkey manager</dt><dd>The passkey's private key (never exported), credential ID, user handle and RP ID. Windows Hello and security keys keep it on the device; Microsoft Password Manager can sync it to the user's other devices.</dd></div>
+            <div><dt>Browser (<code>localStorage</code>)</dt><dd>A non-secret marker, <code>saml-emergency-login-v1</code>: the binding ID and expiry of keys set up in this browser, so the sign-in page knows when to offer emergency login. Cookies hold a random browser ID and, during an emergency session, the MachineKey-protected session ID.</dd></div>
+            <div><dt>This site's registry</dt><dd><code>state\registry.bin</code>, protected with the ASP.NET MachineKey. Keys: credential ID, user handle, public key (COSE), signature counter, account hash. Credentials: claims snapshot, issue and expiry times, status, token digest, and the decrypted EC shown above. Also sessions, the revocation sync cursor and queued removal reports.</dd></div>
+            <div><dt>This site's key files</dt><dd><code>decryption-key.bin</code>: the private RSA key that decrypts ECs (DPAPI, usable only on this server). <code>issuer-signing-keys.json</code>: Identify's public signing keys, trusted for offline verification.</dd></div>
+            <div><dt>Identify (CH2)</dt><dd>Its issuer state: key bindings with their public keys, captured login records (up to 24 hours), revocations, its private signing key, and this site's public encryption key. Identify never has the passkey's or this site's private key.</dd></div>
+        </dl>
+
+        <h4>4. Emergency login</h4>
+        <ol>
+            <li>The sign-in page reads the marker and asks this site (<code>login-status</code>) whether each marked key is still active. Only then does it show <strong>Other login options</strong>. Identify is not contacted.</li>
+            <li><strong>Emergency login</strong> sends the marked binding IDs. The site creates a one-time challenge, valid for two minutes and bound to this browser's cookie, that names those keys' credential IDs and requires user verification.</li>
+            <li>The browser calls <code>navigator.credentials.get()</code>. Windows Hello (face, fingerprint or PIN) verifies the user, and the authenticator signs the authenticator data and a hash of the client data, which contains the challenge and the page origin, with the private key.</li>
+            <li>This site verifies the response against its registry: challenge, origin, RP ID hash, user presence and user verification flags, the signature with the stored public key, the user handle, and the signature counter (which detects cloned or replayed signatures). The key must not be removed or blocked, and its newest credential must be active and unexpired.</li>
+            <li>The site records an emergency session in its registry, at most eight hours and never beyond the credential's expiry, and sets a MachineKey-protected session cookie.</li>
+        </ol>
+
+        <h4>5. Claims after login</h4>
+        <ul>
+            <li>On every request the site looks up the session, its credential and the credential's claims snapshot in the registry, and builds the emergency user from it. Claim types, values and repeated values (roles, BPP privileges) are kept exactly as Identify signed them.</li>
+            <li>Claim types starting with <code>emergency</code> or <code>local_</code> are removed from the snapshot, so the original assertion cannot override the session. The site then adds its own: <code>emergency</code>, <code>local_assurance=emergency-possession</code>, the session ID and the session expiry. Historical claims such as the NSIS LoA describe the original login, not this session.</li>
+            <li>Nothing is fetched from the IdP or Identify, which is why emergency login works while they are down. Claims are as fresh as the normal login that prepared or last renewed the credential. The normal SAML login and logout handlers and STS service calls reject an emergency session.</li>
+        </ul>
+
+        <h4>6. Renewal, removal and revocation</h4>
+        <ul>
+            <li>Credentials last 30 days. After a normal login, once half the lifetime has passed, the site renews the credential in the background with Identify: same passkey, fresh claims, no prompt.</li>
+            <li>Removing a key deletes its registry entries and sessions and reports the revocation to Identify; if Identify is unavailable, the report is queued and retried.</li>
+            <li>When key status loads after a normal login, the site synchronizes with Identify at most every ten minutes: it refreshes the trusted signing keys and applies central revocations. A revocation the site has not yet received cannot block an offline emergency login.</li>
+        </ul>
+    </section>
 
 <% } else { %>
     <section class="card">
@@ -75,7 +142,7 @@
 <% } %>
 
     <asp:ContentPlaceHolder ID="Body" runat="server" />
-    <noscript><p class="notice">JavaScript, IndexedDB, and WebAuthn are required.</p></noscript>
+    <noscript><p class="notice">JavaScript and WebAuthn are required.</p></noscript>
 
     <details id="issuer-diagnostics" class="card">
         <summary>Identify endpoint results (PoC)</summary>

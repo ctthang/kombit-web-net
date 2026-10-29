@@ -1,9 +1,10 @@
 (function () {
     'use strict';
-    // "Other login options" on login.ashx. The card is revealed only when this browser holds an
-    // emergency credential that the server still accepts, and its button runs the emergency key
-    // check in place: one WebAuthn prompt, then the emergency home page. Discovery is read-only:
-    // it never creates browser storage, never contacts Identify, and never prompts for a key.
+    // "Other login options" on login.ashx. The card is revealed only when this browser has set
+    // up an emergency key that the server still accepts, and its button runs the emergency key
+    // check in place: one passkey prompt, then the emergency home page. The browser holds no
+    // emergency credential; a non-secret marker (binding ID) says which keys it set up, and the
+    // passkey identifies the key at login. Discovery never contacts Identify or prompts for a key.
     const card = document.getElementById('emergency-login-option');
     if (!card) return;
     // With a single (or default) IdP the page is shown only to offer emergency login. When this
@@ -11,7 +12,7 @@
     const proceed = () => {
         if (card.dataset.continue) location.replace(card.dataset.continue);
     };
-    if (!window.indexedDB || !window.PublicKeyCredential || !window.fetch) {
+    if (!window.PublicKeyCredential || !window.fetch) {
         proceed();
         return;
     }
@@ -19,7 +20,7 @@
     const status = document.getElementById('emergency-login-status');
 
     const messages = {
-        credential_unavailable: 'This emergency key is no longer active. Prepare it again after a normal login.',
+        credential_unavailable: 'This passkey is not an active emergency key. Set up emergency access again after a normal login.',
         csrf_or_origin_rejected: 'The request was rejected. Reload the page and try again.',
         key_proof_rejected: 'The key check was rejected.',
         proof_expired: 'The key check took too long. Try again.',
@@ -47,8 +48,8 @@
 
     // Steer the browser to the configured authenticator so it can skip its chooser.
     // EmergencyCredential.Authenticator: security-key | platform | any (no change).
-    // Registration also pins the attachment. Login only adds a hint: transports are a hard
-    // filter, so login uses the transports the key itself reported at registration instead.
+    // Registration also pins the attachment. Login only adds a hint: it names no key, so there
+    // are no transports to restrict.
     function applyAuthenticator(options, ceremony) {
         const kind = card.dataset.authenticator;
         if (kind !== 'security-key' && kind !== 'platform') return options;
@@ -91,79 +92,116 @@
         return value;
     }
 
-    function storedEntries() {
+    const markerKey = 'saml-emergency-login-v1';
+
+    function readMarker() {
+        try {
+            const list = JSON.parse(localStorage.getItem(markerKey) || '[]');
+            return Array.isArray(list) ? list.filter(item => item && typeof item.binding_id === 'string') : [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function forget(bindingIds) {
+        try {
+            const list = readMarker().filter(item => !bindingIds.includes(item.binding_id));
+            if (list.length) localStorage.setItem(markerKey, JSON.stringify(list));
+            else localStorage.removeItem(markerKey);
+        } catch (_) {}
+    }
+
+    function remember(bindingId, expiresAt) {
+        try {
+            const list = readMarker().filter(item => item.binding_id !== bindingId);
+            list.push({ binding_id: bindingId, expires_at: expiresAt });
+            localStorage.setItem(markerKey, JSON.stringify(list));
+        } catch (_) {}
+    }
+    // One-time migration: earlier versions kept the emergency credential in IndexedDB. Keep only
+    // each entry's binding ID and expiry as the non-secret marker, then delete that database.
+    function migrateOldCopies() {
         return new Promise(resolve => {
+            const name = 'saml-emergency-credentials-v1';
+            if (!window.indexedDB) return resolve();
             let request;
             try {
-                request = indexedDB.open('saml-emergency-credentials-v1', 1);
+                request = indexedDB.open(name, 1);
             } catch (_) {
-                resolve([]);
-                return;
+                return resolve();
             }
+            const done = () => {
+                try {
+                    indexedDB.deleteDatabase(name);
+                } catch (_) {}
+                resolve();
+            };
             request.onupgradeneeded = event => {
-                // No database yet means no prepared key; do not create an empty one.
+                // No old database: do not create one.
                 if (event.oldVersion === 0) request.transaction.abort();
             };
-            request.onerror = request.onblocked = () => resolve([]);
+            request.onerror = request.onblocked = () => resolve();
             request.onsuccess = () => {
-                const database = request.result;
-                if (!database.objectStoreNames.contains('entries')) {
-                    database.close();
-                    resolve([]);
-                    return;
+                const db = request.result;
+                if (!db.objectStoreNames.contains('entries')) {
+                    db.close();
+                    return done();
                 }
-                const transaction = database.transaction('entries', 'readonly');
+                const transaction = db.transaction('entries', 'readonly');
                 const all = transaction.objectStore('entries').getAll();
                 transaction.oncomplete = () => {
-                    database.close();
-                    resolve(all.result || []);
+                    db.close();
+                    for (const entry of all.result || [])
+                        if (entry && typeof entry.binding_id === 'string')
+                            remember(entry.binding_id, entry.expires_at);
+                    done();
                 };
                 transaction.onerror = transaction.onabort = () => {
-                    database.close();
-                    resolve([]);
+                    db.close();
+                    done();
                 };
             };
         });
     }
-
-    async function isActive(entry) {
+    async function isActive(bindingId) {
         try {
-            const value = await send('login-status', { emergency_credential: entry.emergency_credential });
+            const value = await send('login-status', { binding_id: bindingId });
             return value.active === true;
         } catch (_) {
             return false;
         }
     }
 
-    async function activeKeys() {
+    // Binding IDs of the active keys set up in this browser; stale marker entries are dropped.
+    let activeBindings = [];
+    async function hasActiveKey() {
         const now = Date.now();
-        // Newest stored credential per key; renewals leave older copies behind in the browser.
-        const newest = new Map();
-        for (const entry of await storedEntries()) {
-            if (
-                !entry ||
-                typeof entry.emergency_credential !== 'string' ||
-                typeof entry.binding_id !== 'string' ||
-                typeof entry.expires_at !== 'number' ||
-                entry.expires_at * 1000 <= now
-            )
-                continue;
-            const current = newest.get(entry.binding_id);
-            if (!current || entry.expires_at > current.expires_at) newest.set(entry.binding_id, entry);
+        const stale = [];
+        activeBindings = [];
+        for (const item of readMarker()) {
+            if (typeof item.expires_at === 'number' && item.expires_at * 1000 <= now) {
+                stale.push(item.binding_id);
+            } else if (await isActive(item.binding_id)) {
+                activeBindings.push(item.binding_id);
+            } else {
+                stale.push(item.binding_id);
+            }
         }
-        const active = [];
-        for (const entry of newest.values()) if (await isActive(entry)) active.push(entry);
-        return active;
+        if (stale.length) forget(stale);
+        return activeBindings.length > 0;
     }
 
-    async function login(entry) {
-        const pending = await send('login-options', { emergency_credential: entry.emergency_credential });
+    async function login() {
+        // Only the non-secret binding IDs are sent. The server names those keys' passkeys in the
+        // challenge, so the browser goes straight to the right one instead of listing every
+        // passkey it holds for this site.
+        const pending = await send('login-options', { binding_ids: activeBindings });
         const options = pending.publicKey;
         options.challenge = bytes(options.challenge);
-        options.allowCredentials.forEach(key => (key.id = bytes(key.id)));
-        // Transports the key reported at registration (newer setups store them).
-        if (Array.isArray(entry.transports) && entry.transports.length)
-            options.allowCredentials.forEach(key => (key.transports = entry.transports.slice()));
+        options.allowCredentials = (options.allowCredentials || []).map(item => ({
+            type: item.type || 'public-key',
+            id: bytes(item.id),
+        }));
         applyAuthenticator(options, 'get');
         const started = Date.now();
         let key;
@@ -177,7 +215,6 @@
                 message: error.message,
                 afterMs: error.webauthnMs,
                 hints: options.hints || null,
-                transports: options.allowCredentials.map(item => item.transports || null),
             });
             throw error;
         }
@@ -199,30 +236,28 @@
         });
         location.assign(result.redirect);
     }
-
-    function button(label, entry) {
+    function button(label) {
         const element = document.createElement('button');
         element.type = 'button';
         element.className = 'btn btn-default login-alt-button';
         element.textContent = label;
         element.addEventListener('click', async () => {
-            const buttons = actions.querySelectorAll('button');
-            buttons.forEach(item => (item.disabled = true));
+            element.disabled = true;
             show('Confirm with your security key or passkey...', 'busy');
             try {
-                await login(entry);
+                await login();
             } catch (error) {
                 show(
                     error.name === 'NotAllowedError' && error.webauthnMs < 1500
                         ? 'The browser refused the key check without showing a prompt (' +
-                          error.name + ': ' + error.message + '). Use the browser where this ' +
-                          'key was set up, or check that it can use your passkey or security key.'
+                          error.name + ': ' + error.message + '). Check that this browser can use ' +
+                          'your passkey or security key.'
                         : error.name === 'NotAllowedError'
-                        ? 'Key check cancelled or timed out. Try again when your key is ready.'
+                        ? 'Key check cancelled, timed out, or no emergency passkey was found on this device. Try again when your key is ready.'
                         : error.message || 'Emergency login failed.',
                     'error',
                 );
-                buttons.forEach(item => (item.disabled = false));
+                element.disabled = false;
             }
         });
         return element;
@@ -230,22 +265,12 @@
 
     (async function () {
         try {
-            const keys = await activeKeys();
-            if (!keys.length) {
+            await migrateOldCopies();
+            if (!(await hasActiveKey())) {
                 proceed();
                 return;
             }
-            keys.sort((a, b) => b.expires_at - a.expires_at);
-            actions.replaceChildren(
-                ...keys.map(entry =>
-                    button(
-                        keys.length === 1
-                            ? 'Emergency login'
-                            : 'Emergency login with key ...' + entry.binding_id.slice(-6),
-                        entry,
-                    ),
-                ),
-            );
+            actions.replaceChildren(button('Emergency login'));
             card.hidden = false;
         } catch (_) {
             // Any failure keeps the card hidden; normal login is unaffected.

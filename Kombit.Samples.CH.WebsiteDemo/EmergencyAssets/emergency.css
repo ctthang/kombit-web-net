@@ -185,6 +185,8 @@ main {
     margin: 0 auto;
     padding: 1.5rem 1rem 3rem;
     display: grid;
+    /* minmax(0, ...) stops wide content (such as the credential JSON) widening the page. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
 }
 
@@ -465,6 +467,43 @@ code,
     font-family: var(--mono);
     font-size: 0.875em;
     overflow-wrap: anywhere;
+}
+
+/* Decrypted credential and technical explanation (emergency home page) */
+
+.raw-json {
+    margin: 0.75rem 0 0;
+    padding: 0.75rem 1rem;
+    max-height: 32rem;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-muted);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    /* Keep the indentation but wrap long values (URIs, keys) inside the card. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.raw-json code {
+    font-size: inherit;
+}
+
+.how-it-works h4 {
+    margin: 1.25rem 0 0.4rem;
+    font-size: 1rem;
+}
+
+.how-it-works ol,
+.how-it-works ul {
+    margin: 0;
+    padding-left: 1.4rem;
+}
+
+.how-it-works li + li {
+    margin-top: 0.35rem;
 }
 
 /* Badges: the label text carries the meaning, colour only reinforces it. */

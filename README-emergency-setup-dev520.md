@@ -160,7 +160,7 @@ A prepared browser can use emergency login immediately; no local activation step
 | `csrf_rejected` | Reload the page, then retry with the freshly issued CSRF token. |
 | Windows: "There was a problem signing in with your passkey" at emergency login | The browser was told to look only for an authenticator kind or transport the key does not match, or (in InPrivate) the passkey sits in Edge's Microsoft Password Manager. Check `EmergencyCredential.Authenticator` against the key that was registered; in InPrivate, save the passkey to Windows Hello (**Save another way**) or use a normal window. |
 | "WebAuthn is not supported on sites with TLS certificate errors" | The browser does not trust the site certificate; no page setting can override this. Use a trusted certificate, or for local testing only set the Edge/Chrome policy `AllowWebAuthnWithBrokenTlsCerts` and restart the browser. |
-| No credential in this browser | Use the original browser/profile; clearing site data removes the stored credential. After fresh normal login, remove any **Browser copy missing** registration before preparing the same key again. |
+| Emergency card missing on the sign-in page | The card appears only in browsers that set up a key (non-secret marker in `localStorage`). After clearing site data or in another browser, sign in normally and set up emergency access again, or remove an unused key under **Manage keys**. |
 
 ## Deployment preparation update
 

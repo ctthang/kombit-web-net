@@ -169,59 +169,24 @@
         const element = document.getElementById(id);
         if (element) element.addEventListener('click', action(operation));
     }
-    async function deleteStoredBinding(bindingId) {
-        const db = await new Promise((resolve, reject) => {
-            const request = indexedDB.open('saml-emergency-credentials-v1', 1);
-            request.onupgradeneeded = () => request.result.createObjectStore('entries', { keyPath: 'ec_id' });
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(new Error('Browser storage is unavailable.'));
-        });
+    // The browser keeps no emergency credential. A non-secret marker lists the keys set up in
+    // this browser (binding ID and expiry) so the sign-in page knows when to offer emergency
+    // login. The sign-in page and My Page migrate and delete the IndexedDB copy older versions kept.
+    const markerKey = 'saml-emergency-login-v1';
+    function readMarker() {
         try {
-            await new Promise((resolve, reject) => {
-                const transaction = db.transaction('entries', 'readwrite');
-                const cursor = transaction.objectStore('entries').openCursor();
-                cursor.onsuccess = () => {
-                    const item = cursor.result;
-                    if (!item) return;
-                    if (item.value.binding_id === bindingId) item.delete();
-                    item.continue();
-                };
-                transaction.oncomplete = resolve;
-                transaction.onerror = transaction.onabort = () => reject(new Error('Key removed from the server, but browser cleanup failed. Retry browser cleanup before using emergency login.'));
-            });
-        } finally { db.close(); }
-    }
-
-    async function storage(record) {
-        const database = await new Promise((resolve, reject) => {
-            const request = indexedDB.open('saml-emergency-credentials-v1', 1);
-            request.onupgradeneeded = () =>
-                request.result.createObjectStore('entries', { keyPath: 'ec_id' });
-            request.onerror = () => reject(new Error('Browser storage is unavailable.'));
-            request.onsuccess = () => resolve(request.result);
-        });
-        try {
-            return await new Promise((resolve, reject) => {
-                const transaction = database.transaction(
-                    'entries',
-                    record ? 'readwrite' : 'readonly',
-                );
-                const entries = transaction.objectStore('entries');
-                const request = record ? entries.put(record) : entries.getAll();
-                transaction.oncomplete = () => resolve(request.result);
-                transaction.onerror = transaction.onabort = () =>
-                    reject(new Error('Storage failed. Emergency preparation is incomplete.'));
-            });
-        } finally {
-            database.close();
+            const list = JSON.parse(localStorage.getItem(markerKey) || '[]');
+            return Array.isArray(list) ? list.filter(item => item && typeof item.binding_id === 'string') : [];
+        } catch (_) {
+            return [];
         }
     }
-    // Setup and renewal run on My Page. Here a stored pending credential can be finished
-    // without a second key check: the server activates it after browser read-back.
-    async function activateStored(entry) {
-        await send('activate-stored', { emergency_credential: entry.emergency_credential });
-        show('Ready. This browser can use emergency login from the sign-in page.', 'success');
-        await displayKeys();
+    function forgetBinding(bindingId) {
+        try {
+            const list = readMarker().filter(item => item.binding_id !== bindingId);
+            if (list.length) localStorage.setItem(markerKey, JSON.stringify(list));
+            else localStorage.removeItem(markerKey);
+        } catch (_) {}
     }
     function control(label, work, variant) {
         const button = element('button', variant || 'secondary', label);
@@ -258,7 +223,7 @@
         return button;
     }
     const statusLabels = {
-        pending: 'Setup unfinished',
+        pending: 'Not activated',
         active: 'Active',
         replaced: 'Replaced',
         blocked: 'Blocked',
@@ -267,90 +232,57 @@
     async function displayKeys() {
         const list = document.getElementById('saved-keys');
         if (!list) return;
-        const saved = await storage();
         const state = page.dataset.mode === 'prepare' ? await send('status') : null;
         list.replaceChildren();
-        for (const entry of saved) {
-            const current = state && state.credentials.find(item => item.ec_id === entry.ec_id);
-            if (state && !current) continue;
-            const expired = entry.expires_at * 1000 <= Date.now();
-            const status = current ? current.status : 'active';
+        if (!state) return;
+        // Keys belong to the account on the server; show each key's newest credential.
+        const newest = new Map();
+        for (const item of state.credentials || []) {
+            const current = newest.get(item.binding_id);
+            if (!current || item.expires_at > current.expires_at) newest.set(item.binding_id, item);
+        }
+        const here = new Set(readMarker().map(item => item.binding_id));
+        for (const entry of newest.values()) {
             const row = element('li', 'key');
             const head = element('div', 'key-head');
             head.append(
                 element('span', 'key-name', 'Key \u2026' + entry.binding_id.slice(-6)),
-                element(
-                    'span',
-                    'badge ' + status,
-                    statusLabels[status] || (status === 'stored' ? 'Stored' : status),
-                ),
+                element('span', 'badge ' + entry.status, statusLabels[entry.status] || entry.status),
             );
-            if (current && current.renew_soon && status === 'active')
+            if (here.has(entry.binding_id)) head.append(element('span', 'badge active', 'This browser'));
+            if (entry.renew_soon && entry.status === 'active')
                 head.append(element('span', 'badge pending', 'Renew soon'));
             row.append(head);
             row.append(
                 element(
                     'span',
                     'key-meta',
-                    (expired ? 'Expired ' : 'Expires ') +
-                        new Date(entry.expires_at * 1000).toLocaleString() +
-                        (state || expired ? '' : ' \u00b7 checked by the server on use'),
+                    (entry.status === 'expired' ? 'Expired ' : 'Expires ') +
+                        new Date(entry.expires_at * 1000).toLocaleString(),
                 ),
             );
+            const id = element('span', 'key-meta', 'Binding ID: ');
+            id.append(element('code', null, entry.binding_id));
+            row.append(id);
             const actions = element('div', 'actions');
-            if (state) {
-                if (current.status === 'pending')
-                    actions.append(
-                        control('Finish setup', () => activateStored(entry), 'primary'),
-                    );
-                actions.append(
-                    confirmControl(
-                        'Remove key locally',
-                        'Remove key \u2026' + entry.binding_id.slice(-6) + ' and end its emergency sessions?',
-                        async () => {
-                            await send('remove', { binding_id: entry.binding_id });
-                            await deleteStoredBinding(entry.binding_id);
-                            show(
-                                'Key removed from this browser and the local registry. Failed issuer reports remain queued.',
-                                'success',
-                            );
-                            await displayKeys();
-                        },
-                    ),
-                );
-                const id = element('span', 'key-meta', 'Binding ID: ');
-                id.append(element('code', null, entry.binding_id));
-                row.append(id);
-            }
-            if (actions.children.length) row.append(actions);
+            actions.append(
+                confirmControl(
+                    'Remove key',
+                    'Remove key \u2026' + entry.binding_id.slice(-6) + ' and end its emergency sessions?',
+                    async () => {
+                        await send('remove', { binding_id: entry.binding_id });
+                        forgetBinding(entry.binding_id);
+                        show('Key removed. Failed issuer reports remain queued and are retried.', 'success');
+                        await displayKeys();
+                    },
+                ),
+            );
+            row.append(actions);
             list.append(row);
-        }
-        // Status belongs to the authenticated account, even after browser storage is cleared.
-        if (state) {
-            const missing = new Map();
-            for (const entry of state.credentials) {
-                if (!saved.some(record => record.binding_id === entry.binding_id && state.credentials.some(item => item.ec_id === record.ec_id))) missing.set(entry.binding_id, entry);
-            }
-            for (const entry of missing.values()) {
-                const row = element('li', 'key');
-                row.append(element('span', 'key-name', 'Key \u2026' + entry.binding_id.slice(-6)),
-                    element('p', 'key-meta', 'Browser copy missing. Remove this registration before preparing the same authenticator again. This also ends its emergency sessions in other browsers.'));
-                row.append(confirmControl('Remove key locally', 'Remove registration for key \u2026' + entry.binding_id.slice(-6) + ' and end its emergency sessions?', async () => {
-                    await send('remove', { binding_id: entry.binding_id });
-                    await deleteStoredBinding(entry.binding_id);
-                    show('Registration removed locally. If Identify is unavailable, its revocation is queued; wait for it to synchronize before preparing this key again.', 'success');
-                    await displayKeys();
-                }));
-                list.append(row);
-            }
         }
         if (!list.children.length)
             list.append(
-                element(
-                    'li',
-                    'empty',
-                    'This browser has no matching prepared credential. Use normal login to prepare.',
-                ),
+                element('li', 'empty', 'No emergency keys are registered for your account. Set one up on My Page.'),
             );
     }
     connect('exit', async () => {

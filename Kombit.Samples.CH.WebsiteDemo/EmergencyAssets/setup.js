@@ -3,17 +3,17 @@
     // Emergency access widget: a card on My Page, or an inline button on the home page
     // (data-layout="inline", label from data-setup-label). After a normal login it:
     // - offers one-click setup for this browser (one WebAuthn registration prompt),
-    // - finishes any setup that stopped after the browser stored its credential,
-    // - renews an active credential silently once half its lifetime has passed.
-    // Activation needs no second key check: the server activates a credential once this
-    // browser has stored and read it back; possession is proven at emergency login.
+    // - renews any of the account's keys silently once half their lifetime has passed.
+    // The browser stores no emergency credential: the server activates it at registration and
+    // emergency login uses the discoverable passkey itself. Only a non-secret marker (binding ID
+    // and expiry) is kept so the sign-in page knows this browser has a key.
     const card = document.getElementById('emergency-setup');
     if (!card) return;
     const text = document.getElementById('emergency-setup-text');
     const actions = document.getElementById('emergency-setup-actions');
     const status = document.getElementById('emergency-setup-status');
     const inline = card.dataset.layout === 'inline';
-    const database = 'saml-emergency-credentials-v1';
+    const markerKey = 'saml-emergency-login-v1';
 
     const messages = {
         csrf_or_origin_rejected: 'The request was rejected. Reload the page and try again.',
@@ -65,8 +65,8 @@
 
     // Steer the browser to the configured authenticator so it can skip its chooser.
     // EmergencyCredential.Authenticator: security-key | platform | any (no change).
-    // Registration also pins the attachment. Login only adds a hint: transports are a hard
-    // filter, so login uses the transports the key itself reported at registration instead.
+    // Registration also pins the attachment. Login only adds a hint: it names no key, so there
+    // are no transports to restrict.
     function applyAuthenticator(options, ceremony) {
         const kind = card.dataset.authenticator;
         if (kind !== 'security-key' && kind !== 'platform') return options;
@@ -109,74 +109,89 @@
         return value;
     }
 
-    function open() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(database, 1);
-            request.onupgradeneeded = () =>
-                request.result.createObjectStore('entries', { keyPath: 'ec_id' });
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = request.onblocked = () =>
-                reject(new Error('Browser storage is unavailable.'));
-        });
-    }
-
-    async function withStore(mode, work) {
-        const db = await open();
+    function readMarker() {
         try {
-            return await new Promise((resolve, reject) => {
-                const transaction = db.transaction('entries', mode);
-                const result = work(transaction.objectStore('entries'));
-                transaction.oncomplete = () => resolve(result && 'result' in result ? result.result : undefined);
-                transaction.onerror = transaction.onabort = () =>
-                    reject(new Error('Browser storage failed. Emergency access is not ready.'));
-            });
-        } finally {
-            db.close();
+            const list = JSON.parse(localStorage.getItem(markerKey) || '[]');
+            return Array.isArray(list) ? list.filter(item => item && typeof item.binding_id === 'string') : [];
+        } catch (_) {
+            return [];
         }
     }
 
-    const storedEntries = () => withStore('readonly', store => store.getAll()).then(list => list || []);
-    const put = entry => withStore('readwrite', store => store.put(entry));
+    function writeMarker(list) {
+        try {
+            if (list.length) localStorage.setItem(markerKey, JSON.stringify(list));
+            else localStorage.removeItem(markerKey);
+        } catch (_) {
+            // Without the marker the sign-in page just does not offer emergency login here.
+        }
+    }
 
-    function removeOlderCopies(bindingId, keepId) {
-        return withStore('readwrite', store => {
-            const cursor = store.openCursor();
-            cursor.onsuccess = () => {
-                const item = cursor.result;
-                if (!item) return;
-                if (item.value.binding_id === bindingId && item.value.ec_id !== keepId) item.delete();
-                item.continue();
+    function remember(bindingId, expiresAt) {
+        const list = readMarker().filter(item => item.binding_id !== bindingId);
+        list.push({ binding_id: bindingId, expires_at: expiresAt });
+        writeMarker(list);
+    }
+    // One-time migration: earlier versions kept the emergency credential in IndexedDB. Keep only
+    // each entry's binding ID and expiry as the non-secret marker, then delete that database.
+    function migrateOldCopies() {
+        return new Promise(resolve => {
+            const name = 'saml-emergency-credentials-v1';
+            if (!window.indexedDB) return resolve();
+            let request;
+            try {
+                request = indexedDB.open(name, 1);
+            } catch (_) {
+                return resolve();
+            }
+            const done = () => {
+                try {
+                    indexedDB.deleteDatabase(name);
+                } catch (_) {}
+                resolve();
+            };
+            request.onupgradeneeded = event => {
+                // No old database: do not create one.
+                if (event.oldVersion === 0) request.transaction.abort();
+            };
+            request.onerror = request.onblocked = () => resolve();
+            request.onsuccess = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains('entries')) {
+                    db.close();
+                    return done();
+                }
+                const transaction = db.transaction('entries', 'readonly');
+                const all = transaction.objectStore('entries').getAll();
+                transaction.oncomplete = () => {
+                    db.close();
+                    for (const entry of all.result || [])
+                        if (entry && typeof entry.binding_id === 'string')
+                            remember(entry.binding_id, entry.expires_at);
+                    done();
+                };
+                transaction.onerror = transaction.onabort = () => {
+                    db.close();
+                    done();
+                };
             };
         });
     }
-
-    // Store, read back, then activate on the server. No WebAuthn prompt.
-    async function storeAndActivate(entry) {
-        await put(entry);
-        const saved = (await storedEntries()).find(item => item.ec_id === entry.ec_id);
-        if (!saved || saved.emergency_credential !== entry.emergency_credential)
-            throw new Error('Browser storage read-back failed. Emergency access is not ready.');
-        await send('activate-stored', { emergency_credential: saved.emergency_credential });
-        await removeOlderCopies(entry.binding_id, entry.ec_id);
-    }
-
     async function setUp() {
         let pending;
         try {
-            if (navigator.storage && navigator.storage.persist) await navigator.storage.persist();
             pending = await send('enroll');
             const options = pending.publicKey;
             options.challenge = bytes(options.challenge);
             options.user.id = bytes(options.user.id);
             (options.excludeCredentials || []).forEach(key => (key.id = bytes(key.id)));
-            // Emergency login always names the key (allowCredentials), so a discoverable passkey is
-            // not needed. Asking for a non-discoverable credential lets Windows and browsers skip
-            // their "Save your passkey" step and keeps security-key slots free.
+            // Emergency login names no key: the passkey must be discoverable, and user
+            // verification is required because the passkey is then the only factor.
             options.authenticatorSelection = Object.assign({}, options.authenticatorSelection, {
-                residentKey: 'discouraged',
-                requireResidentKey: false,
-            });
-            applyAuthenticator(options, 'create');
+                residentKey: 'required',
+                requireResidentKey: true,
+                userVerification: 'required',
+            });            applyAuthenticator(options, 'create');
             const started = Date.now();
             let key;
             try {
@@ -194,7 +209,7 @@
                 throw error;
             }
             const transports = key.response.getTransports ? key.response.getTransports() : [];
-            const entry = await send('enroll-complete', {
+            const ready = await send('enroll-complete', {
                 id: pending.enrollment_id,
                 credential: {
                     id: key.id,
@@ -209,9 +224,8 @@
                 },
             });
             pending = null;
-            // Kept with the browser copy so emergency login can target this key's transports.
-            entry.transports = transports;
-            await storeAndActivate(entry);
+            // The server has activated the credential; remember only that this browser has a key.
+            remember(ready.binding_id, ready.expires_at);
         } finally {
             if (pending) {
                 try {
@@ -254,37 +268,42 @@
 
     async function refresh(allowRenewal) {
         const state = await send('status');
-        const stored = await storedEntries();
-        const byId = new Map(stored.map(entry => [entry.ec_id, entry]));
         const mine = state.credentials || [];
-
-        // Finish a setup or renewal that stopped after the browser stored its copy.
+        const newest = new Map();
         for (const item of mine) {
-            const entry = byId.get(item.ec_id);
-            if (item.status !== 'pending' || !entry) continue;
-            try {
-                await send('activate-stored', { emergency_credential: entry.emergency_credential });
-                await removeOlderCopies(entry.binding_id, entry.ec_id);
-                item.status = 'active';
-            } catch (_) {}
+            if (item.status !== 'active') continue;
+            const current = newest.get(item.binding_id);
+            if (!current || item.expires_at > current.expires_at) newest.set(item.binding_id, item);
         }
 
-        const ready = mine.filter(item => item.status === 'active' && byId.has(item.ec_id));
-        const manage = link('Manage keys', card.dataset.manage, inline ? 'btn-link' : 'btn-default');
-        if (ready.length) {
-            const due = ready.find(item => item.renew_due);
-            if (allowRenewal && due && state.can_prepare) {
-                try {
-                    const renewed = await send('renew', { binding_id: due.binding_id });
-                    // Renewal keeps the same key, so carry its registered transports over.
-                    renewed.transports = (byId.get(due.ec_id) || {}).transports || [];
-                    await storeAndActivate(renewed);
-                    return refresh(false);
-                } catch (_) {
-                    // Renewal is retried after the next normal login; the current key stays valid.
-                }
+        // Renewal needs no browser copy: renew any due key of this account.
+        const due = [...newest.values()].find(item => item.renew_due);
+        if (allowRenewal && due && state.can_prepare) {
+            try {
+                const renewed = await send('renew', { binding_id: due.binding_id });
+                if (readMarker().some(item => item.binding_id === renewed.binding_id))
+                    remember(renewed.binding_id, renewed.expires_at);
+                return refresh(false);
+            } catch (_) {
+                // Renewal is retried after the next normal login; the current key stays valid.
             }
-            const latest = Math.max(...ready.map(item => item.expires_at));
+        }
+
+        // Keep the marker in step with this account's keys; entries of other accounts stay.
+        const accountKeys = new Set(mine.map(item => item.binding_id));
+        writeMarker(
+            readMarker()
+                .filter(item => !accountKeys.has(item.binding_id) || newest.has(item.binding_id))
+                .map(item =>
+                    newest.has(item.binding_id)
+                        ? { binding_id: item.binding_id, expires_at: newest.get(item.binding_id).expires_at }
+                        : item,
+                ),
+        );
+        const here = readMarker().filter(item => newest.has(item.binding_id));
+        const manage = link('Manage keys', card.dataset.manage, inline ? 'btn-link' : 'btn-default');
+        if (here.length) {
+            const latest = Math.max(...here.map(item => item.expires_at));
             describe(
                 'Emergency access is ready on this browser until ' + date(latest) +
                     '. It renews automatically when you sign in normally.',
@@ -296,16 +315,7 @@
         }
 
         card.dataset.state = 'setup';
-        const lost = mine.some(item => item.status === 'active' && !byId.has(item.ec_id));
-        if (lost) {
-            describe(
-                'A key is registered for your account, but this browser no longer has its copy. ' +
-                    'Remove that key under Manage keys, then set up emergency access again.',
-                [manage],
-                'This browser lost its emergency key copy.',
-            );
-            return;
-        }
+        const elsewhere = newest.size > 0;
         if (!state.can_prepare) {
             describe(
                 'Sign in again to set up emergency access for this browser.',
@@ -313,18 +323,20 @@
                     inline
                         ? link('Sign in again to prepare emergency access', card.dataset.login)
                         : link('Sign in again', card.dataset.login, 'btn-primary'),
-                ],
+                ].concat(elsewhere ? [manage] : []),
             );
             return;
         }
         describe(
-            'Set up emergency access so you can still sign in from this browser if your identity ' +
-                'provider is unavailable. Your browser asks for your security key or passkey once.',
-            [setupButton()],
+            elsewhere
+                ? 'Emergency access is set up for your account in another browser or device. Set it ' +
+                      'up here too if you want emergency login from this browser.'
+                : 'Set up emergency access so you can still sign in from this browser if your identity ' +
+                      'provider is unavailable. Your browser asks for your security key or passkey once.',
+            [setupButton()].concat(elsewhere ? [manage] : []),
         );
     }
-
-    if (!window.PublicKeyCredential || !window.indexedDB || !window.fetch) {
+    if (!window.PublicKeyCredential || !window.fetch) {
         describe(
             'This browser does not support security keys or passkeys, so emergency access cannot be set up here.',
             [],
@@ -332,7 +344,7 @@
         );
         return;
     }
-    refresh(true).catch(error => {
+    migrateOldCopies().then(() => refresh(true)).catch(error => {
         describe('Emergency access status is unavailable right now.', [], 'Emergency access status is unavailable.');
         show(error.message, 'error');
     });

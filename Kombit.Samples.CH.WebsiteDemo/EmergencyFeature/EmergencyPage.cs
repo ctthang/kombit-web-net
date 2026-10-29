@@ -16,6 +16,28 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
             get { return Context.User as ClaimsPrincipal; }
         }
 
+        /// <summary>Registry record of the session's credential (home page only).</summary>
+        public Newtonsoft.Json.Linq.JObject SessionCredential { get; private set; }
+
+        /// <summary>The decrypted, signature-verified EC as indented JSON, or null when not kept.</summary>
+        public string RawCredentialJson
+        {
+            get
+            {
+                Newtonsoft.Json.Linq.JToken raw = SessionCredential?["raw"];
+                return raw == null || raw.Type == Newtonsoft.Json.Linq.JTokenType.Null
+                    ? null
+                    : raw.ToString(Newtonsoft.Json.Formatting.Indented);
+            }
+        }
+
+        public string FormatTime(Newtonsoft.Json.Linq.JToken seconds)
+        {
+            return seconds == null || seconds.Type != Newtonsoft.Json.Linq.JTokenType.Integer
+                ? string.Empty
+                : DateTimeOffset.FromUnixTimeSeconds((long)seconds).ToString("u");
+        }
+
         protected override void OnInit(EventArgs e)
         {
             base.OnInit(e);
@@ -32,6 +54,14 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                 if (Mode == "home" && !EmergencyWeb.IsEmergency(Context))
                 {
                     Response.Redirect(ResolveUrl("~/EmergencyEnded.aspx"), true);
+                }
+                if (Mode == "home")
+                {
+                    Claim session = EmergencyUser.FindFirst("emergency_session");
+                    SessionCredential = EmergencyWeb.Service.SessionCredential(
+                        session?.Value,
+                        EmergencyWeb.Browser(Context, false)
+                    );
                 }
                 CsrfToken = EmergencyWeb.Csrf(Context);
             }

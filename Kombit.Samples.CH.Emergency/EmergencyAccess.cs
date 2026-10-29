@@ -392,6 +392,7 @@ namespace Kombit.Samples.CH.Emergency
                     )
                     {
                         old["status"] = "replaced";
+                        old.Remove("raw");
                     }
                     entry["status"] = "active";
                     key["active_issued"] = entry["issued"];
@@ -525,6 +526,7 @@ namespace Kombit.Samples.CH.Emergency
                         )
                         {
                             old["status"] = "replaced";
+                            old.Remove("raw");
                         }
                         entry["status"] = "active";
                         key["active_issued"] = entry["issued"];
@@ -533,32 +535,203 @@ namespace Kombit.Samples.CH.Emergency
                         Event(data, "credential_activated");
                         return new JObject { ["ready"] = true };
                     }
-                    JObject sessions = (JObject)data["sessions"];
-                    foreach (
-                        JProperty expired in sessions
+                    return CreateSession(data, proof, entry, key, count, browser);
+                });
+            }
+        }
+
+        private JObject CreateSession(
+            JObject data,
+            KeyProof proof,
+            JObject entry,
+            JObject key,
+            uint count,
+            string browser
+        )
+        {
+            JObject sessions = (JObject)data["sessions"];
+            foreach (
+                JProperty expired in sessions
+                    .Properties()
+                    .Where(item => (long)item.Value["expires"] <= Now)
+                    .ToArray()
+            )
+            {
+                expired.Remove();
+            }
+            if (sessions.Count >= 2000)
+            {
+                throw new EmergencyFailure(503, "session_capacity");
+            }
+            long end = Math.Min(Now + settings.SessionMinutes * 60, (long)entry["expires"]);
+            string session = Wire.RandomId();
+            sessions[session] = new JObject
+            {
+                ["credential"] = proof.Credential,
+                ["browser"] = browser,
+                ["expires"] = end,
+            };
+            key["counter"] = (long)count;
+            key["revision"] = proof.Revision + 1;
+            Event(data, "session_created");
+            return new JObject { ["session"] = session, ["expires"] = end };
+        }
+
+        /// <summary>
+        ///     Starts usernameless emergency login: a one-time challenge that names no key. The browser
+        ///     holds no emergency credential; the registered passkey identifies the key.
+        /// </summary>
+        /// <param name="bindings">
+        ///     Optional binding IDs from the browser's non-secret marker. Active ones are named in the
+        ///     challenge so the browser goes straight to that passkey; unknown, blocked, or inactive
+        ///     ones are ignored. Without any, the challenge names no key.
+        /// </param>
+        public JObject StartDiscoverableLogin(string browser, IEnumerable<string> bindings = null)
+        {
+            lock (state.SyncRoot)
+            {
+                Prune();
+                if (proofs.Count >= 1000)
+                {
+                    throw new EmergencyFailure(503, "proof_capacity");
+                }
+                List<string> named = (bindings ?? Enumerable.Empty<string>())
+                    .Where(IsBindingActiveForLogin)
+                    .Select(binding => state.Inspect(data => (string)data["keys"][binding]["authenticator"]))
+                    .Distinct()
+                    .ToList();
+                KeyProof proof = new KeyProof
+                {
+                    Id = Wire.RandomId(),
+                    Browser = browser,
+                    Purpose = "discoverable",
+                    Deadline = Now + 120,
+                    // An authenticator may omit the user handle when the challenge names its key.
+                    RequireUserHandle = named.Count == 0,
+                    Options = webauthn.CreateDiscoverable(named),
+                };
+                proofs.Add(proof.Id, proof);
+                return new JObject
+                {
+                    ["transaction_id"] = proof.Id,
+                    ["expires_at"] = proof.Deadline,
+                    ["publicKey"] = JObject.Parse(proof.Options.ToJson()),
+                };
+            }
+        }
+
+        /// <summary>
+        ///     Completes usernameless emergency login. The passkey's credential ID selects the
+        ///     registered key; its newest active credential supplies the session's claims. The
+        ///     signature, user handle, user verification, and counter are checked against the key
+        ///     stored in the registry. No Identify request is made.
+        /// </summary>
+        public async Task<JObject> CompleteDiscoverableLogin(string browser, string id, JObject response)
+        {
+            KeyProof proof;
+            lock (state.SyncRoot)
+            {
+                if (
+                    !proofs.TryGetValue(id, out proof)
+                    || proof.Browser != browser
+                    || proof.Purpose != "discoverable"
+                )
+                {
+                    throw new EmergencyFailure(410, "proof_unavailable");
+                }
+                proofs.Remove(id);
+                if (proof.Deadline <= Now)
+                {
+                    throw new EmergencyFailure(410, "proof_expired");
+                }
+            }
+            string authenticator = Wire.String(response, "rawId", 2048);
+            lock (state.SyncRoot)
+            {
+                state.Inspect(data =>
+                {
+                    JProperty match = ((JObject)data["keys"])
+                        .Properties()
+                        .FirstOrDefault(item =>
+                            (string)item.Value["authenticator"] == authenticator
+                            && !(bool)item.Value["blocked"]
+                        );
+                    JObject entry = match == null
+                        ? null
+                        : ((JObject)data["credentials"])
                             .Properties()
-                            .Where(item => (long)item.Value["expires"] <= Now)
-                            .ToArray()
+                            .Select(item => (JObject)item.Value)
+                            .Where(item =>
+                                (string)item["binding"] == match.Name
+                                && (string)item["status"] == "active"
+                                && (long)item["expires"] > Now
+                            )
+                            .OrderByDescending(item => (long)item["issued"])
+                            .FirstOrDefault();
+                    if (entry == null)
+                    {
+                        throw new EmergencyFailure(403, "credential_unavailable");
+                    }
+                    JObject key = (JObject)match.Value;
+                    proof.Credential = (string)entry["id"];
+                    proof.Digest = (string)entry["digest"];
+                    proof.Binding = match.Name;
+                    proof.Authenticator = (string)key["authenticator"];
+                    proof.Handle = (string)key["handle"];
+                    proof.Cose = (string)key["cose"];
+                    proof.Counter = (uint)key["counter"];
+                    proof.Revision = (long)key["revision"];
+                    proof.Deadline = Math.Min(proof.Deadline, (long)entry["expires"]);
+                    return true;
+                });
+            }
+            uint count = await webauthn.Verify(response, proof).ConfigureAwait(false);
+            lock (state.SyncRoot)
+            {
+                return state.Change(data =>
+                {
+                    JObject entry = Eligible(data, proof.Credential, "active"),
+                        key = (JObject)data["keys"][proof.Binding];
+                    if (
+                        proof.Deadline <= Now
+                        || (long)key["revision"] != proof.Revision
+                        || (uint)key["counter"] != proof.Counter
+                        || (string)entry["digest"] != proof.Digest
                     )
                     {
-                        expired.Remove();
+                        throw new EmergencyFailure(409, "state_changed_retry");
                     }
-                    if (sessions.Count >= 2000)
-                    {
-                        throw new EmergencyFailure(503, "session_capacity");
-                    }
-                    long end = Math.Min(Now + settings.SessionMinutes * 60, (long)entry["expires"]);
-                    string session = Wire.RandomId();
-                    sessions[session] = new JObject
-                    {
-                        ["credential"] = proof.Credential,
-                        ["browser"] = browser,
-                        ["expires"] = end,
-                    };
-                    key["counter"] = (long)count;
-                    key["revision"] = proof.Revision + 1;
-                    Event(data, "session_created");
-                    return new JObject { ["session"] = session, ["expires"] = end };
+                    return CreateSession(data, proof, entry, key, count, browser);
+                });
+            }
+        }
+
+        /// <summary>
+        ///     Read-only check for the sign-in page: true when the key with this binding ID exists,
+        ///     is not blocked, and has an active, unexpired credential. Binding IDs are random and
+        ///     reveal nothing else; no Identify request is made.
+        /// </summary>
+        public bool IsBindingActiveForLogin(string binding)
+        {
+            if (string.IsNullOrEmpty(binding) || binding.Length > 128)
+            {
+                return false;
+            }
+            lock (state.SyncRoot)
+            {
+                return state.Inspect(data =>
+                {
+                    JObject key = data["keys"][binding] as JObject;
+                    return key != null
+                        && !(bool)key["blocked"]
+                        && ((JObject)data["credentials"])
+                            .Properties()
+                            .Select(item => (JObject)item.Value)
+                            .Any(item =>
+                                (string)item["binding"] == binding
+                                && (string)item["status"] == "active"
+                                && (long)item["expires"] > Now
+                            );
                 });
             }
         }
@@ -594,6 +767,43 @@ namespace Kombit.Samples.CH.Emergency
                 throw new EmergencyFailure(403, "key_blocked");
             }
             return key;
+        }
+
+        /// <summary>
+        ///     The registry record behind an emergency session, for display on the emergency home
+        ///     page: the credential's identifiers, status, and the decrypted, signature-verified EC
+        ///     (<c>raw</c>, null for credentials issued before it was kept). Null when the session
+        ///     is unknown, expired, or belongs to another browser.
+        /// </summary>
+        public JObject SessionCredential(string session, string browser)
+        {
+            if (session == null)
+            {
+                return null;
+            }
+            return state.Inspect(data =>
+            {
+                JObject ticket = data["sessions"][session] as JObject;
+                if (ticket == null || (string)ticket["browser"] != browser || (long)ticket["expires"] <= Now)
+                {
+                    return null;
+                }
+                JObject entry = data["credentials"][(string)ticket["credential"]] as JObject;
+                if (entry == null)
+                {
+                    return null;
+                }
+                return new JObject
+                {
+                    ["ec_id"] = entry["id"],
+                    ["binding_id"] = entry["binding"],
+                    ["status"] = entry["status"],
+                    ["issued"] = entry["issued"],
+                    ["expires"] = entry["expires"],
+                    ["session_expires"] = ticket["expires"],
+                    ["raw"] = entry["raw"]?.DeepClone(),
+                };
+            });
         }
 
         public ClaimsPrincipal Authenticate(string session, string browser)

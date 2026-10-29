@@ -41,6 +41,26 @@ namespace Kombit.Samples.CH.Emergency
             );
         }
 
+        /// <summary>
+        ///     Challenge for usernameless emergency login: no key is named, so the authenticator offers
+        ///     the discoverable passkey it holds for this site. User verification is required because
+        ///     the passkey is then the only factor.
+        /// </summary>
+        public AssertionOptions CreateDiscoverable(System.Collections.Generic.IEnumerable<string> credentialIds = null)
+        {
+            // Naming the keys this browser set up lets the browser go straight to the right passkey
+            // instead of listing every passkey it holds for this site.
+            return AssertionOptions.Create(
+                configuration,
+                Wire.Decode(Wire.RandomId()),
+                (credentialIds ?? Enumerable.Empty<string>())
+                    .Select(id => new PublicKeyCredentialDescriptor(Wire.Decode(id)))
+                    .ToArray(),
+                UserVerificationRequirement.Required,
+                new AuthenticationExtensionsClientInputs()
+            );
+        }
+
         public async Task<uint> Verify(JObject input, KeyProof pending)
         {
             string stage = "shape";
@@ -98,7 +118,7 @@ namespace Kombit.Samples.CH.Emergency
                 }
                 stage = "user-handle";
                 string handle = Wire.NullableString(response, "userHandle");
-                if (handle != null && handle != pending.Handle)
+                if ((handle == null && pending.RequireUserHandle) || (handle != null && handle != pending.Handle))
                 {
                     throw Wire.Invalid();
                 }

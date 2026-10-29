@@ -16,6 +16,8 @@ namespace Kombit.Samples.CH.Emergency
         public uint Counter { get; set; }
         public long Revision { get; set; }
         public long Deadline { get; set; }
+        /// <summary>Discoverable login: the authenticator must return the user handle.</summary>
+        public bool RequireUserHandle { get; set; }
         public AssertionOptions Options { get; set; }
     }
 }

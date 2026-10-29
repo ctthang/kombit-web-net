@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -69,15 +70,19 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                             );
                             break;
                         case "enroll-complete":
+                        {
                             Wire.Fields(body, "id", "credential");
-                            result = await access.FinishRegistration(
-                                EmergencyWeb.NormalHandle(context),
+                            string normal = EmergencyWeb.NormalHandle(context);
+                            JObject issued = await access.FinishRegistration(
+                                normal,
                                 browser,
                                 Wire.String(body, "id", 128),
                                 (JObject)body["credential"],
                                 cancellation
                             );
+                            result = Activate(access, browser, normal, issued);
                             break;
+                        }
                         case "enroll-cancel":
                             Wire.Fields(body, "id");
                             await access.CancelRegistration(
@@ -89,49 +94,57 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                             result = new JObject();
                             break;
                         case "renew":
+                        {
                             Wire.Fields(body, "binding_id");
-                            result = await access.Renew(
-                                EmergencyWeb.NormalHandle(context),
+                            string normal = EmergencyWeb.NormalHandle(context);
+                            JObject issued = await access.Renew(
+                                normal,
                                 browser,
                                 Wire.String(body, "binding_id", 128),
                                 cancellation
                             );
+                            result = Activate(access, browser, normal, issued);
                             break;
+                        }
                         case "status":
                             Wire.Fields(body);
                             string handle = EmergencyWeb.NormalHandle(context);
                             await access.SynchronizeIfDue(cancellation);
                             result = access.Readiness(handle, browser);
                             break;
-                        case "activate-stored":
-                            Wire.Fields(body, "emergency_credential");
-                            result = access.ActivateStored(
-                                browser,
-                                Wire.String(body, "emergency_credential", 65536),
-                                EmergencyWeb.NormalHandle(context)
-                            );
-                            break;
                         case "login-status":
-                            Wire.Fields(body, "emergency_credential");
-                            result = new JObject { ["active"] = access.IsActiveForLogin(Wire.String(body, "emergency_credential", 65536)) };
+                            // Non-secret marker from this browser: is its key still usable?
+                            Wire.Fields(body, "binding_id");
+                            result = new JObject
+                            {
+                                ["active"] = access.IsBindingActiveForLogin(
+                                    Wire.String(body, "binding_id", 128)
+                                ),
+                            };
                             break;
                         case "login-options":
-                            Wire.Fields(body, "emergency_credential");
-                            result = access.StartProof(
+                        {
+                            // Optional binding IDs from this browser's marker; no credential is sent.
+                            Wire.Fields(body, "binding_ids");
+                            JArray marked = body["binding_ids"] as JArray;
+                            if (body["binding_ids"] != null && (marked == null || marked.Count > 10))
+                            {
+                                throw Wire.Invalid();
+                            }
+                            result = access.StartDiscoverableLogin(
                                 browser,
-                                Wire.String(body, "emergency_credential", 65536),
-                                true,
-                                null
+                                marked?.Select(item => item.Type == JTokenType.String ? (string)item : null)
+                                    .Where(item => item != null && item.Length <= 128)
+                                    .ToList()
                             );
                             break;
+                        }
                         case "login-complete":
                             Wire.Fields(body, "transaction_id", "credential");
-                            JObject ticket = await access.CompleteProof(
+                            JObject ticket = await access.CompleteDiscoverableLogin(
                                 browser,
                                 Wire.String(body, "transaction_id", 128),
-                                true,
-                                (JObject)body["credential"],
-                                null
+                                (JObject)body["credential"]
                             );
                             EmergencyWeb.IssueSession(context, (string)ticket["session"]);
                             result = new JObject
@@ -200,6 +213,23 @@ namespace Kombit.Samples.CH.WebsiteDemo.EmergencyFeature
                     );
                 }
             }
+        }
+
+        /// <summary>
+        ///     Activates a newly issued or renewed credential on the server and returns only
+        ///     non-secret details. The emergency credential itself never reaches the browser; the
+        ///     binding ID lets the sign-in page ask whether this browser's key is still usable.
+        /// </summary>
+        private static JObject Activate(EmergencyAccess access, string browser, string normal, JObject issued)
+        {
+            access.ActivateStored(browser, Wire.String(issued, "emergency_credential", 65536), normal);
+            return new JObject
+            {
+                ["ready"] = true,
+                ["binding_id"] = issued["binding_id"],
+                ["ec_id"] = issued["ec_id"],
+                ["expires_at"] = issued["expires_at"],
+            };
         }
 
         private static async Task<JObject> Read(HttpContext context)
