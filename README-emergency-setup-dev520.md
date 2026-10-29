@@ -24,6 +24,7 @@ This guide records the local setup for `https://kombitspnew.safewhere.local/`. C
 | WebAuthn RP ID | `kombitspnew.safewhere.local` |
 | Backend authentication | `ApiKey` in the client and matching Identify issuer client configuration |
 | External file directory | `C:\ProgramData\SafewhereSamples\SamlEmergency` |
+| Preferred authenticator | `EmergencyCredential.Authenticator` = `platform` (Windows Hello on this PC); `any` is the default |
 
 The issuer was checked against the deployed `metadata\dev520.xml`; the SP entity ID was checked against the deployed `Web.config`. Preserve their exact spelling and trailing-slash differences.
 
@@ -125,10 +126,11 @@ Add or update these entries inside the deployed `Web.config`'s existing `<appSet
 <add key="EmergencyCredential.Enabled" value="true" />
 <add key="EmergencyCredential.SettingsFile" value="C:\ProgramData\SafewhereSamples\SamlEmergency\emergency-settings.json" />
 <add key="EmergencyCredential.StateDirectory" value="C:\ProgramData\SafewhereSamples\SamlEmergency\state" />
+<add key="EmergencyCredential.Authenticator" value="platform" />
 <add key="aspnet:UseTaskFriendlySynchronizationContext" value="true" />
 ```
 
-The state directory must match the external JSON. Neither that JSON nor its contents belong inside the web root.
+The state directory must match the external JSON. Neither that JSON nor its contents belong inside the web root. `EmergencyCredential.Authenticator` is optional: `platform` targets Windows Hello on this PC, `security-key` targets a USB, NFC, or BLE key, and `any` (the default) lets the browser offer every option. It steers the browser's choice but does not remove the passkey save confirmation or the Windows Hello prompt; see [Preferred authenticator](README-emergency.md#preferred-authenticator). Choose it before users prepare their browsers.
 
 Stop/start `Identify dev520` once to load the new issuer client configuration (only if it changed). Start the SAML pool after its settings, trust keys, and machine key are ready. Use stop/wait/start rather than an overlapping recycle because each PoC state file has one writer. No Identify OAuth2 source modification is needed for this SAML configuration.
 
@@ -156,6 +158,8 @@ A prepared browser can use emergency login immediately; no local activation step
 | BPP absent in emergency claims | Confirm the normal assertion carries `privilegesIntermediate` and Identify's issuer client has `PreserveNormalClaims` enabled, then renew. |
 | Claims remain old after a configuration change | Fresh normal login, credential renewal, possession check, then login using the newest credential. |
 | `csrf_rejected` | Reload the page, then retry with the freshly issued CSRF token. |
+| Windows: "There was a problem signing in with your passkey" at emergency login | The browser was told to look only for an authenticator kind or transport the key does not match, or (in InPrivate) the passkey sits in Edge's Microsoft Password Manager. Check `EmergencyCredential.Authenticator` against the key that was registered; in InPrivate, save the passkey to Windows Hello (**Save another way**) or use a normal window. |
+| "WebAuthn is not supported on sites with TLS certificate errors" | The browser does not trust the site certificate; no page setting can override this. Use a trusted certificate, or for local testing only set the Edge/Chrome policy `AllowWebAuthnWithBrokenTlsCerts` and restart the browser. |
 | No credential in this browser | Use the original browser/profile; clearing site data removes the stored credential. After fresh normal login, remove any **Browser copy missing** registration before preparing the same key again. |
 
 ## Deployment preparation update

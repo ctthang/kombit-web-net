@@ -33,10 +33,11 @@ For the local dev520/kombitspnew deployment, use the [step-by-step setup guide a
    <add key="EmergencyCredential.Enabled" value="true" />
    <add key="EmergencyCredential.SettingsFile" value="C:\ProgramData\SafewhereSamples\SamlEmergency\emergency-settings.json" />
    <add key="EmergencyCredential.StateDirectory" value="C:\ProgramData\SafewhereSamples\SamlEmergency\state" />
+   <add key="EmergencyCredential.Authenticator" value="any" />
    <add key="aspnet:UseTaskFriendlySynchronizationContext" value="true" />
    ```
 
-   The state path must match the external JSON. The synchronization setting supports the async handler while keeping the current framework.
+   The state path must match the external JSON. `EmergencyCredential.Authenticator` is optional (`any`, `platform`, or `security-key`); see [Preferred authenticator](#preferred-authenticator). The synchronization setting supports the async handler while keeping the current framework.
 
 State uses `MachineKey.Protect` with an application-specific purpose. Private RSA files use machine-bound DPAPI and an audience-specific purpose. Restrict ACLs to the application identity and approved administrators. Use one worker; a second writer is rejected. Loss of state or a machine-key change requires deliberate recovery and new preparation. DPAPI files are not portable between machines.
 
@@ -119,16 +120,38 @@ No request bodies, query values, cookies, tokens, credentials, API keys, or clai
 
 ## Preferred authenticator
 
-Set `EmergencyCredential.Authenticator` in the deployed `Web.config` app settings to choose which authenticator the browser asks for during emergency setup and emergency login:
+`EmergencyCredential.Authenticator` in the deployed `Web.config` `<appSettings>` tells the browser which kind of authenticator to use for emergency setup and emergency login, so supporting browsers can skip their authenticator chooser (this device, security key, or phone).
 
-| Value | Effect |
-|---|---|
-| `any` (default) | No preference. The browser shows its chooser (security key, this device, phone). |
-| `security-key` | Registration asks for a roaming key (`authenticatorAttachment: cross-platform`, hint `security-key`); login offers only USB, NFC, and BLE transports. |
-| `platform` | Registration uses this device, such as Windows Hello (`authenticatorAttachment: platform`, hint `client-device`); login offers only the internal transport. |
+```xml
+<add key="EmergencyCredential.Authenticator" value="platform" />
+```
 
-Unknown values behave as `any`. The browser scripts add these preferences to the options before the WebAuthn prompt; Identify's registration options and the server's assertion checks are unchanged. A specific value lets supporting browsers skip the authenticator chooser, but the operating system's touch, PIN, or Windows Hello prompt always remains. Keys registered under a different preference may not be offered for login, so choose the value before users prepare their browsers. Changing `Web.config` restarts the application.
+| Value | Setup (registration) | Emergency login |
+|---|---|---|
+| `any` (default) | No change; the browser offers every option. | No change. |
+| `platform` | Requests this device, such as Windows Hello (`authenticatorAttachment: platform`, hint `client-device`). | Adds the hint `client-device`. |
+| `security-key` | Requests a roaming USB, NFC, or BLE key (`authenticatorAttachment: cross-platform`, hint `security-key`). | Adds the hint `security-key`. |
 
+A missing, empty, or unknown value behaves as `any`. Changing `Web.config` restarts the application.
+
+How it works:
+
+- The server passes the value to the emergency widgets on the home page, My Page, and the sign-in page. `EmergencyAssets/setup.js` and `EmergencyAssets/login-options.js` add the preference to the WebAuthn options just before the browser prompt. Identify's registration options and the server's verification are unchanged, and user verification stays `preferred` (`poc-up`).
+- Login only adds a hint and never restricts transports. Forcing the `internal` transport made Windows Hello reject an existing passkey ("There was a problem signing in with your passkey"). Instead, setup stores the transports the authenticator reports with the browser copy, renewal carries them over, and login uses them for that key. Keys prepared before this change have no stored transports and rely on the hint.
+- Independently of this value, setup requests a non-discoverable credential (`residentKey: discouraged`): emergency login always names the key, and security keys then need no resident-key slot.
+
+What it does not change:
+
+- The operating system's final prompt (touch, PIN, face, or fingerprint) always remains.
+- The passkey provider's save confirmation at first setup remains and cannot be suppressed by the page: Edge shows "Create a passkey" for Microsoft Password Manager, and Windows shows "Save your passkey". Renewal reuses the key and shows no prompt.
+- In the tested Windows 11 and Edge setup, `platform` did not reduce the number of dialogs. Use the value as a policy ("Windows Hello only" or "security keys only"), not as a prompt reduction.
+- Choose the value before users prepare their browsers. A key registered as one kind may not be offered when the value names the other kind; affected users remove the key under **Manage keys** and prepare again.
+
+Browser notes:
+
+- A passkey saved to Edge's Microsoft Password Manager can sync to the user's other devices. Emergency login still also needs the browser copy of the credential, but the key is then not tied to one PC. To keep it on this device, choose **Save another way** and Windows Hello in Edge's dialog, or use `security-key`.
+- In an InPrivate window, a passkey saved to Microsoft Password Manager could not be used for emergency login in the same session. Prepare and test in a normal window, or save the passkey to Windows Hello.
+- Browsers disable WebAuthn on pages with certificate errors (Edge: "WebAuthn is not supported on sites with TLS certificate errors"), whatever this value is.
 ## Authenticator policy compatibility
 
 The current issuer and both clients use `poc-up`: presence is required, verification is preferred, and valid backup-eligible/backed-up passkeys are accepted. A backup-state bit without backup eligibility is rejected. Signature, origin/RP, one-use challenge, credential ownership, and counter checks remain enforced. Credentials labeled with the older `poc-uv-nonbackup` policy must be renewed to the current policy; they are not silently reinterpreted.
